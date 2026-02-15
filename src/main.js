@@ -39,9 +39,11 @@ loadingManager.onLoad = () => {
 
 loadingManager.onError = (url) => {
   loadingText.textContent = `Failed to load: ${url}`;
-  // Still allow entry
   clickToEnter.style.display = 'block';
 };
+
+// Safety fallback — always show enter button after 5s
+setTimeout(() => { clickToEnter.style.display = 'block'; }, 5000);
 
 // Create scene
 const sceneManager = new SceneManager();
@@ -66,6 +68,14 @@ camera.position.set(0, EYE_HEIGHT, 0);
 // UI
 const hud = new HUD();
 const adminPanel = new AdminPanel();
+
+// Cabin visible by default
+let cabinVisible = true;
+cabin.setVisible(cabinVisible);
+adminPanel.onToggleCabin = () => {
+  cabinVisible = !cabinVisible;
+  cabin.setVisible(cabinVisible);
+};
 
 // Milestone tracking
 let triggeredMilestones = new Set();

@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 
-// Cabin dimensions in km (10m = 0.01 km)
-const W = 0.01;   // width (X)
-const D = 0.01;   // depth (Z)
-const H = 0.004;  // height (Y) = 4m
+const RADIUS = 0.005;    // 5m center to vertex
+const H = 0.004;         // 4m height
+const SIDES = 6;
 
 export class Cabin {
   constructor(scene) {
@@ -11,196 +10,146 @@ export class Cabin {
     scene.add(this.group);
 
     const wallMat = new THREE.MeshStandardMaterial({
-      color: 0x444444,
+      color: 0x556677,
       metalness: 0.7,
       roughness: 0.3,
       side: THREE.DoubleSide,
     });
 
-    const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x333333,
-      metalness: 0.6,
-      roughness: 0.4,
-      side: THREE.DoubleSide,
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0x778899,
+      metalness: 0.8,
+      roughness: 0.2,
+      emissive: 0x223344,
+      emissiveIntensity: 0.2,
     });
 
     const glassMat = new THREE.MeshPhysicalMaterial({
-      color: 0x88ccff,
+      color: 0xaaddff,
       transparent: true,
-      opacity: 0.15,
-      metalness: 0.0,
-      roughness: 0.0,
-      transmission: 0.9,
+      opacity: 0.06,
+      transmission: 0.98,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
 
-    const frameMat = new THREE.MeshStandardMaterial({
-      color: 0x222222,
-      metalness: 0.8,
-      roughness: 0.2,
-    });
+    const ft = 0.0001; // 10cm trim
 
-    // Floor — back half opaque, front half glass
-    // Back half (metal floor)
-    const backFloorGeo = new THREE.PlaneGeometry(W, D / 2);
-    const backFloor = new THREE.Mesh(backFloorGeo, floorMat);
-    backFloor.rotation.x = -Math.PI / 2;
-    backFloor.position.set(0, 0, -D / 4);
-    this.group.add(backFloor);
-
-    // Front half (glass floor)
-    const frontFloorGeo = new THREE.PlaneGeometry(W, D / 2);
-    const frontFloor = new THREE.Mesh(frontFloorGeo, glassMat);
-    frontFloor.rotation.x = -Math.PI / 2;
-    frontFloor.position.set(0, 0, D / 4);
-    this.group.add(frontFloor);
-
-    // Glass floor grid lines for depth perception
-    const gridMat = new THREE.MeshBasicMaterial({ color: 0x4488aa, transparent: true, opacity: 0.3 });
-    for (let i = -4; i <= 4; i++) {
-      const lineGeo = new THREE.PlaneGeometry(0.0001, D / 2);
-      const line = new THREE.Mesh(lineGeo, gridMat);
-      line.rotation.x = -Math.PI / 2;
-      line.position.set(i * W / 10, 0.00001, D / 4);
-      this.group.add(line);
-    }
-    for (let i = 0; i <= 4; i++) {
-      const lineGeo = new THREE.PlaneGeometry(W, 0.0001);
-      const line = new THREE.Mesh(lineGeo, gridMat);
-      line.rotation.x = -Math.PI / 2;
-      line.position.set(0, 0.00001, D / 2 - i * D / 10);
-      this.group.add(line);
+    // Hex vertices
+    const verts = [];
+    for (let i = 0; i < SIDES; i++) {
+      const a = (i / SIDES) * Math.PI * 2;
+      verts.push({ x: Math.cos(a) * RADIUS, z: Math.sin(a) * RADIUS });
     }
 
-    // Ceiling
-    const ceilingGeo = new THREE.PlaneGeometry(W, D);
-    const ceiling = new THREE.Mesh(ceilingGeo, wallMat);
-    ceiling.rotation.x = Math.PI / 2;
-    ceiling.position.set(0, H, 0);
+    // Ceiling — solid hex
+    const hexShape = new THREE.Shape();
+    hexShape.moveTo(verts[0].x, verts[0].z);
+    for (let i = 1; i < SIDES; i++) hexShape.lineTo(verts[i].x, verts[i].z);
+    hexShape.closePath();
+    const ceiling = new THREE.Mesh(new THREE.ShapeGeometry(hexShape), wallMat);
+    ceiling.rotation.x = -Math.PI / 2;
+    ceiling.position.y = H;
     this.group.add(ceiling);
 
-    // Back wall (behind player)
-    const backWallGeo = new THREE.PlaneGeometry(W, H);
-    const backWall = new THREE.Mesh(backWallGeo, wallMat);
-    backWall.position.set(0, H / 2, -D / 2);
-    this.group.add(backWall);
+    // No floor — fully transparent (just glass)
+    const floor = new THREE.Mesh(new THREE.ShapeGeometry(hexShape), glassMat);
+    floor.rotation.x = -Math.PI / 2;
+    this.group.add(floor);
 
-    // Left wall
-    const leftWallGeo = new THREE.PlaneGeometry(D, H);
-    const leftWall = new THREE.Mesh(leftWallGeo, wallMat);
-    leftWall.rotation.y = Math.PI / 2;
-    leftWall.position.set(-W / 2, H / 2, 0);
-    this.group.add(leftWall);
+    // Window config
+    const winBottom = H * 0.25;
+    const winTop = H * 0.85;
+    const winH = winTop - winBottom;
+    const winPad = 0.15; // fraction of side length padding on each side
 
-    // Right wall
-    const rightWall = new THREE.Mesh(leftWallGeo.clone(), wallMat);
-    rightWall.rotation.y = -Math.PI / 2;
-    rightWall.position.set(W / 2, H / 2, 0);
-    this.group.add(rightWall);
+    for (let i = 0; i < SIDES; i++) {
+      const v1 = verts[i];
+      const v2 = verts[(i + 1) % SIDES];
+      const mx = (v1.x + v2.x) / 2;
+      const mz = (v1.z + v2.z) / 2;
+      const dx = v2.x - v1.x;
+      const dz = v2.z - v1.z;
+      const sideLen = Math.sqrt(dx * dx + dz * dz);
 
-    // Front wall — has a large panoramic window opening
-    // We create the frame around the window as thin strips
-    const windowBottom = H * 0.15;  // window starts 15% up (0.6m)
-    const windowTop = H * 0.9;      // window ends 90% up (3.6m)
-    const windowHeight = windowTop - windowBottom;
-    const frameThickness = 0.0002; // 20cm
+      // Outward-facing rotation: normal from center to edge midpoint
+      const faceAngle = Math.atan2(mx, mz);
 
-    // Bottom strip
-    const bottomStripGeo = new THREE.PlaneGeometry(W, windowBottom);
-    const bottomStrip = new THREE.Mesh(bottomStripGeo, wallMat);
-    bottomStrip.position.set(0, windowBottom / 2, D / 2);
-    this.group.add(bottomStrip);
+      const winW = sideLen * (1 - 2 * winPad);
+      const padW = sideLen * winPad;
 
-    // Top strip
-    const topStripGeo = new THREE.PlaneGeometry(W, H - windowTop);
-    const topStrip = new THREE.Mesh(topStripGeo, wallMat);
-    topStrip.position.set(0, (windowTop + H) / 2, D / 2);
-    this.group.add(topStrip);
+      // 4 wall panels around window:
+      // Bottom strip (full width, below window)
+      this.addPanel(mx, mz, faceAngle, sideLen, winBottom, 0, winBottom / 2, wallMat);
+      // Top strip (full width, above window)
+      this.addPanel(mx, mz, faceAngle, sideLen, H - winTop, 0, winTop + (H - winTop) / 2, wallMat);
+      // Left strip (window height, left of window)
+      this.addPanel(mx, mz, faceAngle, padW, winH, -(sideLen - padW) / 2, winBottom + winH / 2, wallMat);
+      // Right strip (window height, right of window)
+      this.addPanel(mx, mz, faceAngle, padW, winH, (sideLen - padW) / 2, winBottom + winH / 2, wallMat);
 
-    // Window glass (very transparent)
-    const windowGeo = new THREE.PlaneGeometry(W - frameThickness * 2, windowHeight);
-    const windowGlass = new THREE.Mesh(windowGeo, glassMat.clone());
-    windowGlass.position.set(0, windowBottom + windowHeight / 2, D / 2 - 0.00001);
-    this.group.add(windowGlass);
+      // Glass window
+      this.addPanel(mx, mz, faceAngle, winW, winH, 0, winBottom + winH / 2, glassMat);
 
-    // Window frame — vertical pillars
-    const pillarGeo = new THREE.BoxGeometry(frameThickness, windowHeight, frameThickness);
-    const leftPillar = new THREE.Mesh(pillarGeo, frameMat);
-    leftPillar.position.set(-W / 2 + frameThickness / 2, windowBottom + windowHeight / 2, D / 2);
-    this.group.add(leftPillar);
+      // Window trim
+      const trimOffsets = [
+        // horizontal top
+        { w: winW + ft * 2, h: ft, ox: 0, oy: winTop },
+        // horizontal bottom
+        { w: winW + ft * 2, h: ft, ox: 0, oy: winBottom },
+      ];
+      for (const t of trimOffsets) {
+        this.addPanel(mx, mz, faceAngle, t.w, t.h, t.ox, t.oy, frameMat);
+      }
 
-    const rightPillar = new THREE.Mesh(pillarGeo.clone(), frameMat);
-    rightPillar.position.set(W / 2 - frameThickness / 2, windowBottom + windowHeight / 2, D / 2);
-    this.group.add(rightPillar);
+      // Vertical trim left/right of window
+      this.addPanel(mx, mz, faceAngle, ft, winH, -winW / 2, winBottom + winH / 2, frameMat);
+      this.addPanel(mx, mz, faceAngle, ft, winH, winW / 2, winBottom + winH / 2, frameMat);
 
-    // Center pillar
-    const centerPillar = new THREE.Mesh(pillarGeo.clone(), frameMat);
-    centerPillar.position.set(0, windowBottom + windowHeight / 2, D / 2);
-    this.group.add(centerPillar);
-
-    // Horizontal frame bars
-    const hBarGeo = new THREE.BoxGeometry(W, frameThickness, frameThickness);
-    const topBar = new THREE.Mesh(hBarGeo, frameMat);
-    topBar.position.set(0, windowTop, D / 2);
-    this.group.add(topBar);
-
-    const bottomBar = new THREE.Mesh(hBarGeo.clone(), frameMat);
-    bottomBar.position.set(0, windowBottom, D / 2);
-    this.group.add(bottomBar);
-
-    // Handrail along window
-    const railGeo = new THREE.BoxGeometry(W * 0.8, 0.0001, 0.0003);
-    const rail = new THREE.Mesh(railGeo, frameMat);
-    rail.position.set(0, H * 0.3, D / 2 - 0.001);
-    this.group.add(rail);
-
-    // Rail supports
-    for (let x = -0.003; x <= 0.003; x += 0.003) {
-      const supportGeo = new THREE.BoxGeometry(0.0001, H * 0.3, 0.0001);
-      const support = new THREE.Mesh(supportGeo, frameMat);
-      support.position.set(x, H * 0.15, D / 2 - 0.001);
-      this.group.add(support);
+      // Corner pillar
+      const pillar = new THREE.Mesh(
+        new THREE.BoxGeometry(ft * 1.5, H, ft * 1.5),
+        frameMat
+      );
+      pillar.position.set(v1.x, H / 2, v1.z);
+      this.group.add(pillar);
     }
 
-    // Bench along back wall
-    const benchGeo = new THREE.BoxGeometry(W * 0.6, 0.0005, 0.002);
-    const bench = new THREE.Mesh(benchGeo, new THREE.MeshStandardMaterial({
-      color: 0x555555, metalness: 0.5, roughness: 0.5,
-    }));
-    bench.position.set(0, 0.0005, -D / 2 + 0.002);
-    this.group.add(bench);
-
-    // Interior lighting
-    const mainLight = new THREE.PointLight(0xffffff, 0.5, 0.05);
-    mainLight.position.set(0, H - 0.0005, 0);
-    this.group.add(mainLight);
-
-    const accentLight = new THREE.PointLight(0x88aaff, 0.3, 0.03);
-    accentLight.position.set(0, 0.001, D / 4);
-    this.group.add(accentLight);
-
-    // Ambient light for the whole scene
-    const ambient = new THREE.AmbientLight(0xffffff, 0.3);
-    scene.add(ambient);
-
-    // Directional light (sunlight)
+    // Lighting
+    const ceilingLight = new THREE.PointLight(0xccddff, 0.5, 0.04);
+    ceilingLight.position.set(0, H - 0.0003, 0);
+    this.group.add(ceilingLight);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.3));
     const sun = new THREE.DirectionalLight(0xffffff, 1.0);
     sun.position.set(100, 50, 80);
     scene.add(sun);
 
-    // Store bounds for collision
+    // Collision — inscribed circle
+    const inradius = RADIUS * Math.cos(Math.PI / SIDES) - 0.0003;
     this.bounds = {
-      minX: -W / 2 + 0.0003,
-      maxX: W / 2 - 0.0003,
-      minZ: -D / 2 + 0.0003,
-      maxZ: D / 2 - 0.0003,
-      floorY: 0,
-      ceilY: H,
+      minX: -inradius, maxX: inradius,
+      minZ: -inradius, maxZ: inradius,
+      floorY: 0, ceilY: H,
     };
   }
 
-  getBounds() {
-    return this.bounds;
+  // Place a panel on a hex wall face.
+  // (mx,mz) = edge midpoint, faceAngle = outward normal angle,
+  // w/h = panel size, offsetX = lateral offset along edge, y = center height
+  addPanel(mx, mz, faceAngle, w, h, offsetX, y, mat) {
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    // Offset along the edge direction (perpendicular to outward normal)
+    const edgeDirX = Math.cos(faceAngle);  // edge runs perpendicular to face normal
+    const edgeDirZ = -Math.sin(faceAngle);
+    plane.position.set(
+      mx + edgeDirX * offsetX,
+      y,
+      mz + edgeDirZ * offsetX
+    );
+    plane.rotation.y = faceAngle;
+    this.group.add(plane);
   }
+
+  setVisible(v) { this.group.visible = v; }
+  getBounds() { return this.bounds; }
 }

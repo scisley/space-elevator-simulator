@@ -26,7 +26,7 @@ export class FirstPersonController {
     this.bounds = null;
 
     // Walk speed in km/s (about 1.5 m/s walking speed)
-    this.walkSpeed = 0.0015 / 1000; // 1.5 m/s in km/s
+    this.walkSpeed = 0.0015; // 1.5 m/s = 0.0015 km/s
 
     this.setupInput(domElement);
   }

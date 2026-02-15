@@ -1,51 +1,42 @@
 import * as THREE from 'three';
-import { CABLE_LENGTH, EARTH_RADIUS } from '../constants.js';
+import { CABLE_LENGTH } from '../constants.js';
+
+// Offset cable slightly so it's beside the cabin, not through the camera
+const CABLE_X = 0; // centered — runs through cabin
 
 export class Cable {
   constructor(scene) {
     this.group = new THREE.Group();
     scene.add(this.group);
 
-    // Nearby cable segment — visible as a thin cylinder
-    // This follows the camera (extends above and below)
-    const nearGeo = new THREE.CylinderGeometry(0.00005, 0.00005, 0.1, 8);
-    const nearMat = new THREE.MeshBasicMaterial({ color: 0x888888 });
+    // Nearby cable segment — visible cylinder that extends above and below
+    const nearGeo = new THREE.CylinderGeometry(0.00015, 0.00015, 0.2, 8); // 15cm radius, 200m tall
+    const nearMat = new THREE.MeshBasicMaterial({ color: 0x999999 });
     this.nearCable = new THREE.Mesh(nearGeo, nearMat);
+    this.nearCable.position.x = CABLE_X;
     this.group.add(this.nearCable);
 
     // Far cable — a line extending the full length
     const farMat = new THREE.LineBasicMaterial({
-      color: 0x666666,
+      color: 0x888888,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.6,
     });
 
-    // Create line points: from surface to 100,000 km
-    // In world space, cable goes along +Y (upward from Earth)
-    // But since Earth is positioned below camera, cable goes through origin
-    const points = [];
-    // Sample points along the cable (logarithmic spacing for visible portions)
-    const altitudes = [0, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 35786, 50000, 75000, 100000];
-    for (const alt of altitudes) {
-      points.push(new THREE.Vector3(0, alt, 0));
-    }
+    const altitudes = [0, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000,
+      5000, 10000, 20000, 35786, 50000, 75000, 100000];
+    const points = altitudes.map(alt => new THREE.Vector3(CABLE_X, alt, 0));
 
-    const farGeo = new THREE.BufferGeometry().setFromPoints(points);
-    this.farCable = new THREE.Line(farGeo, farMat);
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    this.farCable = new THREE.Line(geo, farMat);
     this.group.add(this.farCable);
   }
 
   update(altitudeKm) {
-    // Position the cable group so it aligns with the cabin
-    // Cable runs along Y axis, anchored at Earth's surface
-    // Camera is at origin, Earth surface is at -altitudeKm in Y
+    // Near cable follows camera vertically
+    this.nearCable.position.y = 0;
 
-    // Near cable: centered on camera
-    this.nearCable.position.set(0, 0, 0);
-
-    // Far cable: positioned relative to Earth's surface
-    // Each point's Y is an altitude, but we need to offset by current altitude
-    // so the cable appears at the right positions relative to the camera
+    // Far cable anchored at surface
     this.farCable.position.set(0, -altitudeKm, 0);
   }
 }

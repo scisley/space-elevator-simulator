@@ -15,58 +15,10 @@ export class Earth {
 
     // Day/night shader material
     const dayMap = texLoader.load('/textures/2k_earth_daymap.jpg');
-    const nightMap = texLoader.load('/textures/2k_earth_nightmap.jpg');
-    const specMap = texLoader.load('/textures/2k_earth_specular_map.jpg');
-
-    // Set color space
     dayMap.colorSpace = THREE.SRGBColorSpace;
-    nightMap.colorSpace = THREE.SRGBColorSpace;
 
-    this.earthMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        dayTexture: { value: dayMap },
-        nightTexture: { value: nightMap },
-        specularMap: { value: specMap },
-        sunDirection: { value: new THREE.Vector3(1, 0.3, 0.5).normalize() },
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        varying vec3 vNormal;
-        varying vec3 vPosition;
-        void main() {
-          vUv = uv;
-          vNormal = normalize(normalMatrix * normal);
-          vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D dayTexture;
-        uniform sampler2D nightTexture;
-        uniform sampler2D specularMap;
-        uniform vec3 sunDirection;
-        varying vec2 vUv;
-        varying vec3 vNormal;
-        varying vec3 vPosition;
-        void main() {
-          vec3 normal = normalize(vNormal);
-          float sunDot = dot(normal, sunDirection);
-          float dayFactor = smoothstep(-0.15, 0.25, sunDot);
-          vec4 dayColor = texture2D(dayTexture, vUv);
-          vec4 nightColor = texture2D(nightTexture, vUv);
-          // Night lights are emissive, only show on dark side
-          vec4 color = mix(nightColor * 1.5, dayColor, dayFactor);
-          // Specular highlight on oceans
-          float spec = texture2D(specularMap, vUv).r;
-          if (spec > 0.5 && sunDot > 0.0) {
-            vec3 viewDir = normalize(-vPosition);
-            vec3 reflectDir = reflect(-sunDirection, normal);
-            float specular = pow(max(dot(viewDir, reflectDir), 0.0), 32.0) * 0.3;
-            color.rgb += vec3(specular);
-          }
-          gl_FragColor = color;
-        }
-      `,
+    this.earthMaterial = new THREE.MeshStandardMaterial({
+      map: dayMap,
     });
 
     this.earthMesh = new THREE.Mesh(earthGeo, this.earthMaterial);
@@ -75,15 +27,31 @@ export class Earth {
     // Cloud layer
     const cloudGeo = new THREE.SphereGeometry(EARTH_RADIUS + 10, 64, 64);
     const cloudMap = texLoader.load('/textures/2k_earth_clouds.jpg');
-    cloudMap.colorSpace = THREE.SRGBColorSpace;
-    this.cloudMaterial = new THREE.MeshBasicMaterial({
-      map: cloudMap,
+    this.cloudMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        cloudTexture: { value: cloudMap },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D cloudTexture;
+        varying vec2 vUv;
+        void main() {
+          float cloud = texture2D(cloudTexture, vUv).r;
+          gl_FragColor = vec4(1.0, 1.0, 1.0, cloud * 0.8);
+        }
+      `,
       transparent: true,
-      opacity: 0.35,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
     this.cloudMesh = new THREE.Mesh(cloudGeo, this.cloudMaterial);
+    this.cloudMesh.visible = false;
     this.group.add(this.cloudMesh);
 
     // Atmosphere glow (Fresnel-based)
@@ -134,21 +102,6 @@ export class Earth {
     this.group.add(this.groundPlane);
 
     // Sun direction — position so Ecuador/anchor is in daytime
-    this.setSunDirection();
-  }
-
-  setSunDirection() {
-    // Sun positioned so anchor point (0°N, 80°W) is in daylight
-    // 80°W in radians = -80 * pi/180
-    // We place the sun direction so it illuminates the anchor region
-    const sunLon = ANCHOR_LON_RAD + 0.3; // slightly offset for nice lighting
-    const sunLat = 0.2; // slightly above equator
-    const dir = new THREE.Vector3(
-      Math.cos(sunLat) * Math.cos(sunLon),
-      Math.sin(sunLat),
-      -Math.cos(sunLat) * Math.sin(sunLon)
-    ).normalize();
-    this.earthMaterial.uniforms.sunDirection.value.copy(dir);
   }
 
   /**

@@ -51,45 +51,60 @@ async function pollServer() {
   state.lastPollTime = Date.now();
 }
 
-// Admin API calls
+// Update local segment state (used as fallback and after server calls)
+function setLocalSegment(startAltitudeKm, speedKmh, direction) {
+  state.startAltitudeKm = startAltitudeKm;
+  state.startTimeMs = Date.now();
+  state.speedKmh = speedKmh;
+  state.direction = direction;
+  updateLocalState();
+}
+
+// Admin API calls — fall back to local state if server unavailable
 export async function adminSetAltitude(altitudeKm) {
   try {
-    await fetch('/api/admin/set-altitude', {
+    const res = await fetch('/api/admin/set-altitude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ altitudeKm }),
     });
-    await pollServer();
-  } catch { /* ignore */ }
+    if (res.ok) { await pollServer(); return; }
+  } catch { /* fall through */ }
+  setLocalSegment(altitudeKm, state.speedKmh, state.direction);
 }
 
 export async function adminSetSpeed(speedKmh) {
+  const currentAlt = computeAltitude(state, Date.now());
   try {
-    await fetch('/api/admin/set-speed', {
+    const res = await fetch('/api/admin/set-speed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ speedKmh }),
     });
-    await pollServer();
-  } catch { /* ignore */ }
+    if (res.ok) { await pollServer(); return; }
+  } catch { /* fall through */ }
+  setLocalSegment(currentAlt, speedKmh, state.direction);
 }
 
 export async function adminSetDirection(direction) {
+  const currentAlt = computeAltitude(state, Date.now());
   try {
-    await fetch('/api/admin/set-direction', {
+    const res = await fetch('/api/admin/set-direction', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ direction }),
     });
-    await pollServer();
-  } catch { /* ignore */ }
+    if (res.ok) { await pollServer(); return; }
+  } catch { /* fall through */ }
+  setLocalSegment(currentAlt, state.speedKmh, direction);
 }
 
 export async function adminRestart() {
   try {
-    await fetch('/api/admin/restart', { method: 'POST' });
-    await pollServer();
-  } catch { /* ignore */ }
+    const res = await fetch('/api/admin/restart', { method: 'POST' });
+    if (res.ok) { await pollServer(); return; }
+  } catch { /* fall through */ }
+  setLocalSegment(0, 190, 1);
 }
 
 // Start polling

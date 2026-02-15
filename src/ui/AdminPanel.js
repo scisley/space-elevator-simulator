@@ -4,6 +4,7 @@ export class AdminPanel {
   constructor() {
     this.el = document.getElementById('admin-panel');
     this.visible = false;
+    this.onToggleCabin = null;
 
     // Toggle with backtick
     document.addEventListener('keydown', (e) => {
@@ -33,6 +34,11 @@ export class AdminPanel {
         const dir = parseInt(btn.dataset.dir);
         adminSetDirection(dir);
       });
+    });
+
+    // Toggle cabin
+    document.getElementById('admin-toggle-cabin').addEventListener('click', () => {
+      if (this.onToggleCabin) this.onToggleCabin();
     });
 
     // Restart button
