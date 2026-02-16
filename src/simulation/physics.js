@@ -1,4 +1,4 @@
-import { EARTH_RADIUS, SURFACE_GRAVITY, EARTH_ROTATION_RATE, SKY_FULL_BLUE, SKY_FADE_END } from '../constants.js';
+import { EARTH_RADIUS, SURFACE_GRAVITY, EARTH_ROTATION_RATE, SKY_FULL_BLUE, SKY_FADE_END, GROUND_PLANE_FADE_START, GROUND_PLANE_FADE_END } from '../constants.js';
 
 /**
  * Effective gravity at altitude h (km). Returns m/s².
@@ -44,7 +44,7 @@ export function getAtmosphereOpacity(altitudeKm) {
  * Ground plane opacity — visible at low altitudes, fades out.
  */
 export function getGroundPlaneOpacity(altitudeKm) {
-  if (altitudeKm <= 20) return 1.0;
-  if (altitudeKm >= 100) return 0.0;
-  return 1.0 - (altitudeKm - 20) / 80;
+  if (altitudeKm <= GROUND_PLANE_FADE_START) return 1.0;
+  if (altitudeKm >= GROUND_PLANE_FADE_END) return 0.0;
+  return 1.0 - (altitudeKm - GROUND_PLANE_FADE_START) / (GROUND_PLANE_FADE_END - GROUND_PLANE_FADE_START);
 }

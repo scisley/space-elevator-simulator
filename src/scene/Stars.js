@@ -46,7 +46,7 @@ export class Stars {
 
       this.material = new THREE.ShaderMaterial({
         uniforms: {
-          brightnessMultiplier: { value: 1.0 },
+          brightnessMultiplier: { value: 1.3 },
         },
         vertexShader: `
           attribute float starSize;

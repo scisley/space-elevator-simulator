@@ -77,8 +77,12 @@ const platform = new OrbitalPlatform(scene);
 const controller = new FirstPersonController(camera, renderer.domElement);
 controller.setBounds(cabin.getBounds());
 
-// Camera initial position
-camera.position.set(0, EYE_HEIGHT, 0);
+// Camera initial position — 1m east of cable, facing east
+// East at anchor = cross(up, polarAxis) (perpendicular to radial and polar)
+const eastDir = new THREE.Vector3().crossVectors(polarAxis, new THREE.Vector3(0, 1, 0)).normalize();
+camera.position.copy(eastDir.clone().multiplyScalar(0.001)); // 1m = 0.001 km
+camera.position.y = EYE_HEIGHT;
+camera.lookAt(camera.position.x + eastDir.x, EYE_HEIGHT, camera.position.z + eastDir.z);
 
 // UI
 const hud = new HUD();
@@ -105,8 +109,8 @@ const basisB = new THREE.Vector3().crossVectors(polarAxis, basisA).normalize();
 const sunDirection = new THREE.Vector3();
 
 // Accumulated simulation time (respects timeScale)
-// Start at 6h (morning) so the trip begins at sunrise
-let simElapsedSeconds = 6 * 3600;
+// Start at noon so the ground plane is well-lit during initial ascent
+let simElapsedSeconds = 12 * 3600;
 
 // Milestone tracking
 let triggeredMilestones = new Set();

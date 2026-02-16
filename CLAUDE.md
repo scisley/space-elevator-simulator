@@ -5,7 +5,7 @@ A Three.js space elevator simulation with first-person perspective, day/night cy
 ## Architecture
 
 - **Renderer**: Three.js with WebGL2, logarithmic depth buffer, ACES filmic tone mapping
-- **Scene objects**: Earth, Sun, Stars, Sky, Cable, Cabin, AnchorStation, OrbitalPlatform
+- **Scene objects**: Earth (with regional satellite overlay), Sun, Stars, Sky, Cable, Cabin, AnchorStation, OrbitalPlatform
 - **Frame of reference**: Earth is stationary below the camera; the sun and stars orbit around Earth's polar axis (simulating Earth's rotation from the elevator's co-rotating frame)
 - **Units**: 1 unit = 1 km throughout the scene
 
@@ -20,7 +20,7 @@ These were hard-won through extensive debugging. Read carefully before modifying
 - Custom `ShaderMaterial` requires manually replicating all of these steps, and getting it wrong produces flickering dark spots, wrong colors, or washed-out rendering
 - World-space normals via `modelMatrix * vec4(normal, 0.0)` have precision issues at large distances from origin
 
-**Current approach**: `MeshStandardMaterial` for the daymap (proven stable), with a **separate overlay mesh** for night city lights using additive blending.
+**Current approach**: `MeshStandardMaterial` for the daymap (proven stable), with a **separate overlay mesh** for night city lights using additive blending. A regional satellite texture ground plane provides higher resolution at low altitudes (see "Regional Satellite Tiles" section).
 
 ### 2. Night Lights Overlay — Depth and Render Order
 
@@ -29,7 +29,8 @@ The night lights overlay (`Earth.js`) uses `depthTest: false` so it renders on t
 **Solution**: The cable (`Cable.js`) uses `transparent: true` (with full opacity) and `renderOrder: 2`. Three.js renders all opaque objects first, then transparent objects sorted by renderOrder. This ensures:
 1. Opaque pass: Day Earth mesh renders and writes depth
 2. Transparent pass (renderOrder 0): Night overlay renders with `depthTest: false`, additive blending
-3. Transparent pass (renderOrder 2): Cable renders with normal blending, fully overwriting night overlay pixels
+3. Transparent pass (renderOrder 1): Regional satellite spherical patch renders, covering night overlay below
+4. Transparent pass (renderOrder 2): Cable renders with normal blending, fully overwriting night overlay pixels
 
 **Key insight**: Three.js renders ALL opaque objects before ALL transparent objects, regardless of `renderOrder`. Setting `renderOrder` on an opaque object only changes its order relative to other opaque objects — it will never render after a transparent object. To control order between opaque-looking and transparent objects, make the opaque-looking object `transparent: true` with full opacity.
 
@@ -70,7 +71,8 @@ Stars use the HYG v4.1 catalog (~8,920 naked-eye stars, mag ≤ 6.5). Run `npm r
 **Solution**: Custom `ShaderMaterial` with:
 - Per-vertex `starSize` buffer attribute, read via `attribute float starSize` and applied as `gl_PointSize`
 - `toneMapped: false` to prevent ACES from crushing brightness variation
-- Sizes derived from apparent magnitude via Pogson's formula; colors from B-V color index
+- Sizes derived from apparent magnitude with capped range (1.0–3.5) and `pow(0.7)` compression to prevent the brightest stars from dominating. Previous `sqrt(brightness) * 5.0` formula produced 1px–18px range where most stars were invisible.
+- Colors encode both spectral type (B-V index) AND apparent brightness (`pow(normalizedBrightness, 0.4)`). This preserves the real brightness hierarchy through color intensity even with compressed sizes.
 - **Flat `gl_PointSize`** (no perspective division) — stars are all on the same sphere at 150,000 km, so perspective scaling produces sub-pixel sizes (~0.002 px) that get discarded on macOS Metal. Use raw size values directly.
 
 ### 7. Additive Blending and Alpha
@@ -95,6 +97,58 @@ Camera is at origin, Earth center is at (0, -(R+alt), 0), so nadir direction is 
 
 Sun glow uses a `THREE.Sprite` with `SpriteMaterial`. Setting `depthTest: false` causes it to render through the cable and other objects. Keep `depthTest` enabled (default) and only disable `depthWrite` for glow effects.
 
+### 10. Ocean Color: Day vs Night Side
+
+The Blue Marble ocean texture pixels are nearly black (~RGB 2,5,20). Making the ocean look blue requires boosting these values, but the boost must NOT be visible on the unlit night side.
+
+**What doesn't work:**
+- Boosting ocean pixels in the texture file — brightens both day and night sides equally
+- `AmbientLight` — illuminates both hemispheres, making the night side ocean visible
+- Increasing `toneMappingExposure` — amplifies the entire frame including the dark side
+- These approaches all failed because they don't distinguish between lit and unlit surfaces
+
+**What works:** Boost the ocean albedo (diffuse color) in the shader via `MeshStandardMaterial.onBeforeCompile`. The PBR pipeline then multiplies albedo × lighting, so:
+- Day side: boosted albedo × sunlight = visible blue
+- Night side: boosted albedo × 0 light = black
+
+```js
+material.onBeforeCompile = (shader) => {
+  shader.fragmentShader = shader.fragmentShader.replace(
+    '#include <map_fragment>',
+    `#include <map_fragment>
+     {
+       float isOcean = step(diffuseColor.b, 0.008) * step(diffuseColor.r, diffuseColor.b) * step(diffuseColor.g, diffuseColor.b);
+       diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 5.0 + vec3(0.002, 0.004, 0.015), isOcean);
+     }`
+  );
+};
+```
+
+This hook is applied to both the globe material and the regional patch material via `Earth._oceanBoostCompile`.
+
+### 11. Night Texture Ocean Tint
+
+The night lights texture (`2k_earth_nightmap.jpg`) has a baked-in blue ocean tint (~RGB 4,6,21 everywhere). With the night shader's `× 3.0` multiplier and `toneMapped: false` (values go straight to framebuffer), this produces a clearly visible dark blue across the entire night hemisphere.
+
+**Fix:** Threshold the night texture brightness in the fragment shader: `step(0.1, maxChannel)`. The ocean max is 21/255 = 0.082, so a threshold of 0.1 kills the tint while preserving actual city lights (which are 25+ per channel).
+
+### 12. sharp Composite + Resize Pipeline Bug
+
+In `sharp`, calling `.composite()` followed by `.resize()` in a single pipeline chain does **not** work as expected — sharp applies resize BEFORE composite internally. Tiles get placed at coordinates that exceed the resized image bounds and silently disappear.
+
+**Fix:** Split into two steps: composite at full resolution to an intermediate PNG buffer, then resize in a separate `sharp()` call.
+
+```js
+// BROKEN — tiles placed outside resized bounds
+const output = await sharp({create: ...}).composite(tiles).resize(8192, 4096).jpeg().toBuffer();
+
+// CORRECT — composite first, then resize separately
+const fullRes = await sharp({create: ...}).composite(tiles).png().toBuffer();
+const output = await sharp(fullRes).resize(8192, 4096).jpeg().toBuffer();
+```
+
+Also note: `sharp({create: {channels: 3}})` internally produces a 4-channel (RGBA) buffer. If you extract raw pixels, use `resolveWithObject: true` and read `info.channels` — don't assume 3.
+
 ## Astronomical Simplifications
 
 The simulation makes deliberate simplifications to the sun and star positions:
@@ -118,16 +172,43 @@ The absolute RA offset between the starfield and the sun is not tied to a real d
 3. Sun RA: `~(dayOfYear / 365) × 2π` offset from vernal equinox
 4. Separate angular velocities for sun (solar day) and stars (sidereal day)
 
+## Textures
+
+The Earth daymap uses an 8K (8192x4096) cloud-free image built from NASA GIBS `BlueMarble_ShadedRelief` tiles (EPSG:4326, zoom 4, 200 tiles composited and downscaled). This layer has shaded relief on land but flat blue oceans (no bathymetry). Run `npm run download-textures` to generate `public/textures/8k_earth_daymap.jpg` (~4 MB). Use `--force` to regenerate. Requires `sharp` as a dev dependency. The `BlueMarble_ShadedRelief_Bathymetry` variant exists but shows ocean floor contours which look unrealistic from space.
+
+The night lights texture stays at 2K — the elevator starts in the morning, so by nightfall altitude is high enough that 2K is sufficient.
+
+Anisotropic filtering (`anisotropy = 16`) is enabled on the daymap for sharp rendering at oblique viewing angles (toward the horizon). Three.js clamps to the GPU's max internally.
+
+### Regional Satellite Tiles (Spherical Patch)
+
+At low altitudes (<300 km), a spherical patch overlays the Earth sphere with high-res regional satellite imagery. The 8K global texture has ~4.9 km/pixel at the equator, which is visibly pixelated below 200 km. The regional overlay provides ~0.6 km/pixel (8x improvement).
+
+**Implementation**: At startup, `TileLoader.js` fetches an 8×8 grid of NASA GIBS cloud-free tiles (zoom level 8, 256px each) centered on the anchor point (0°N, 80°15'W). These are composited onto a 2048×2048 HTML Canvas. The loader also creates an edge-fade alpha map for smooth blending.
+
+In `Earth.js`, the tile bounds are converted to Three.js SphereGeometry `phi`/`theta` parameters and a partial sphere is created at `EARTH_RADIUS + 0.01 km`. This curves naturally with the globe and avoids the flat-plane issues (sharp rectangular edges, z-fighting, projection mismatch).
+
+- Tile source: NASA GIBS WMTS (`BlueMarble_ShadedRelief`, cloud-free, no bathymetry)
+- Tiles are public domain, CORS-enabled, ~0.5–2 MB total
+- Concurrency limited to 8 parallel fetches
+- If >50% of tiles fail, graceful degradation (no patch, only 8K globe)
+- The patch uses `MeshStandardMaterial` with `alphaMap` for edge fading, `transparent: true`, `renderOrder: 1`
+- `onBeforeCompile` ocean boost is applied to the patch material (same as globe) for consistent ocean color
+- 0.01 km radial offset avoids z-fighting with the day mesh in the log depth buffer (0.5 km was too large — visible layer transition at start of ride)
+- Fades out between 50–300 km altitude (constants `GROUND_PLANE_FADE_START` / `GROUND_PLANE_FADE_END`)
+
 ## File Overview
 
 | File | Purpose |
 |------|---------|
 | `src/main.js` | Orchestrates scene, computes sun direction per frame, animation loop |
 | `src/scene/SceneManager.js` | Renderer setup (log depth, tone mapping, bloom) |
-| `src/scene/Earth.js` | Earth day mesh (MeshStandardMaterial) + night overlay (ShaderMaterial, additive) |
+| `src/scene/Earth.js` | Earth day mesh (MeshStandardMaterial) + night overlay (ShaderMaterial, additive) + regional satellite spherical patch |
+| `src/loaders/TileLoader.js` | NASA GIBS tile fetcher, canvas compositor, edge-fade alpha map for regional overlay |
 | `src/scene/Sun.js` | Sun mesh + glow sprite + DirectionalLight + Earth occlusion |
 | `src/scene/Stars.js` | Real star catalog (HYG v4.1, ~8,920 naked-eye stars) with per-star size/color |
 | `scripts/process-stars.mjs` | Downloads HYG catalog, converts to `public/data/stars.json` |
+| `scripts/download-textures.mjs` | Builds 8K cloud-free Earth daymap from NASA GIBS tiles (requires `sharp`) |
 | `src/scene/Sky.js` | Atmosphere gradient, dims at night based on sun elevation |
 | `src/scene/Cable.js` | Near cylinder + far line, transparent with renderOrder 2 for night overlay occlusion |
 | `src/scene/Cabin.js` | Hexagonal cabin with glass ceiling/floor, window panels, interior light |

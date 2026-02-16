@@ -1,8 +1,26 @@
 import * as THREE from 'three';
-import { EARTH_RADIUS, ANCHOR_LAT_RAD, ANCHOR_LON_RAD, ATMO_THICKNESS } from '../constants.js';
+import { EARTH_RADIUS, ANCHOR_LAT, ANCHOR_LON, ANCHOR_LAT_RAD, ANCHOR_LON_RAD, ATMO_THICKNESS } from '../constants.js';
 import { getAtmosphereOpacity, getGroundPlaneOpacity } from '../simulation/physics.js';
+import { loadRegionalTexture } from '../loaders/TileLoader.js';
+
+// Offset above Earth surface (km) to avoid z-fighting with the day mesh
+// Keep minimal — log depth buffer handles small gaps well
+const PATCH_ALTITUDE_OFFSET = 0.01;
 
 export class Earth {
+  // Shared onBeforeCompile hook: boosts dark ocean albedo so it's
+  // visible blue in sunlight but black on the unlit night side.
+  static _oceanBoostCompile(shader) {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `#include <map_fragment>
+       {
+         float isOcean = step(diffuseColor.b, 0.008) * step(diffuseColor.r, diffuseColor.b) * step(diffuseColor.g, diffuseColor.b);
+         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 5.0 + vec3(0.002, 0.004, 0.015), isOcean);
+       }`
+    );
+  }
+
   constructor(scene, loadingManager) {
     this.scene = scene;
     this.group = new THREE.Group();
@@ -11,20 +29,26 @@ export class Earth {
     const texLoader = new THREE.TextureLoader(loadingManager);
 
     // Earth sphere — use MeshStandardMaterial for correct rendering pipeline
-    const earthGeo = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
-    const dayMap = texLoader.load('/textures/2k_earth_daymap.jpg');
+    const earthGeo = new THREE.SphereGeometry(EARTH_RADIUS, 128, 128);
+    const dayMap = texLoader.load('/textures/8k_earth_daymap.jpg');
     dayMap.colorSpace = THREE.SRGBColorSpace;
+    dayMap.anisotropy = 16;
 
     this.earthMaterial = new THREE.MeshStandardMaterial({
       map: dayMap,
     });
+
+    // Boost dark ocean pixels in the albedo so the effect is lighting-dependent:
+    // day side: boosted albedo × sunlight = visible blue
+    // night side: boosted albedo × 0 = black
+    this.earthMaterial.onBeforeCompile = Earth._oceanBoostCompile;
 
     this.earthMesh = new THREE.Mesh(earthGeo, this.earthMaterial);
     this.group.add(this.earthMesh);
 
     // Night lights overlay — separate mesh, additive blending
     // Offset by 5 km to avoid z-fighting with the day mesh (log depth buffer needs margin)
-    const nightGeo = new THREE.SphereGeometry(EARTH_RADIUS + 5, 64, 64);
+    const nightGeo = new THREE.SphereGeometry(EARTH_RADIUS + 5, 128, 128);
     const nightMap = texLoader.load('/textures/2k_earth_nightmap.jpg');
     // No colorSpace — keep raw sRGB values since toneMapped=false bypasses encoding
 
@@ -57,7 +81,11 @@ export class Earth {
           float nightFactor = 1.0 - smoothstep(-0.15, 0.1, NdotL);
 
           vec4 nightColor = texture2D(nightTexture, vUv);
-          vec3 lights = nightColor.rgb * nightFactor * 3.0;
+          // The night texture has a baked-in blue ocean tint (~RGB 4,6,21).
+          // Filter it out: ocean max is 21/255=0.082, so threshold at 0.1.
+          float brightness = max(nightColor.r, max(nightColor.g, nightColor.b));
+          float mask = step(0.1, brightness);
+          vec3 lights = nightColor.rgb * nightFactor * mask * 3.0;
 
           gl_FragColor = vec4(lights, 1.0);
         }
@@ -72,38 +100,8 @@ export class Earth {
     this.nightMesh = new THREE.Mesh(nightGeo, this.nightMaterial);
     this.group.add(this.nightMesh);
 
-    // Cloud layer
-    const cloudGeo = new THREE.SphereGeometry(EARTH_RADIUS + 10, 64, 64);
-    const cloudMap = texLoader.load('/textures/2k_earth_clouds.jpg');
-    this.cloudMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        cloudTexture: { value: cloudMap },
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D cloudTexture;
-        varying vec2 vUv;
-        void main() {
-          float cloud = texture2D(cloudTexture, vUv).r;
-          gl_FragColor = vec4(1.0, 1.0, 1.0, cloud * 0.8);
-        }
-      `,
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    this.cloudMesh = new THREE.Mesh(cloudGeo, this.cloudMaterial);
-    this.cloudMesh.visible = false;
-    this.group.add(this.cloudMesh);
-
     // Atmosphere glow (Fresnel-based)
-    const atmoGeo = new THREE.SphereGeometry(EARTH_RADIUS + ATMO_THICKNESS, 64, 64);
+    const atmoGeo = new THREE.SphereGeometry(EARTH_RADIUS + ATMO_THICKNESS, 128, 128);
     this.atmosphereMaterial = new THREE.ShaderMaterial({
       uniforms: {
         glowColor: { value: new THREE.Color(0.3, 0.6, 1.0) },
@@ -125,7 +123,10 @@ export class Earth {
         varying vec3 vPosition;
         void main() {
           vec3 viewDir = normalize(-vPosition);
-          float rim = 1.0 - max(dot(viewDir, vNormal), 0.0);
+          // Flip normal for BackSide — without this, dot is always ≤ 0
+          // and rim = 1.0 everywhere, flooding the entire disc with glow
+          vec3 normal = -normalize(vNormal);
+          float rim = 1.0 - max(dot(viewDir, normal), 0.0);
           float glow = pow(rim, 3.0) * 1.5;
           gl_FragColor = vec4(glowColor, glow * opacity);
         }
@@ -138,16 +139,59 @@ export class Earth {
     this.atmosphereMesh = new THREE.Mesh(atmoGeo, this.atmosphereMaterial);
     this.group.add(this.atmosphereMesh);
 
-    // Ground plane (ocean) for low-altitude detail
-    const groundGeo = new THREE.PlaneGeometry(200, 200, 1, 1);
-    this.groundMaterial = new THREE.MeshBasicMaterial({
-      color: 0x1a3c5a,
+    // Regional high-res spherical patch (created async when tiles load)
+    this.regionalPatch = null;
+    this.regionalMaterial = null;
+
+    loadingManager.itemStart('regional-tiles');
+    loadRegionalTexture(ANCHOR_LAT, ANCHOR_LON).then((result) => {
+      if (result) {
+        this._createRegionalPatch(result);
+      }
+      loadingManager.itemEnd('regional-tiles');
+    }).catch(() => {
+      loadingManager.itemEnd('regional-tiles');
+    });
+  }
+
+  /**
+   * Create a spherical patch geometry that overlays the Earth sphere
+   * with high-res regional satellite tiles.
+   */
+  _createRegionalPatch({ texture, alphaMap, bounds }) {
+    const { latMin, latMax, lonMin, lonMax } = bounds;
+
+    // Convert geographic bounds to Three.js SphereGeometry parameters.
+    // Three.js SphereGeometry: phi = azimuthal (longitude), theta = polar (from +Y pole).
+    // phi mapping: lon=-180° → phi=0, lon=180° → phi=2π
+    const phiStart = (lonMin + 180) * Math.PI / 180;
+    const phiLength = (lonMax - lonMin) * Math.PI / 180;
+    // theta mapping: lat=90° → theta=0 (north pole), lat=-90° → theta=π (south pole)
+    const thetaStart = (90 - latMax) * Math.PI / 180;
+    const thetaLength = (latMax - latMin) * Math.PI / 180;
+
+    const patchGeo = new THREE.SphereGeometry(
+      EARTH_RADIUS + PATCH_ALTITUDE_OFFSET,
+      64, 64,
+      phiStart, phiLength,
+      thetaStart, thetaLength
+    );
+
+    this.regionalMaterial = new THREE.MeshStandardMaterial({
+      map: texture,
+      alphaMap: alphaMap,
       transparent: true,
       opacity: 1.0,
-      side: THREE.DoubleSide,
+      depthWrite: false,
+      roughness: 0.8,
+      metalness: 0.0,
     });
-    this.groundPlane = new THREE.Mesh(groundGeo, this.groundMaterial);
-    this.group.add(this.groundPlane);
+    this.regionalMaterial.onBeforeCompile = Earth._oceanBoostCompile;
+    this.regionalMaterial.renderOrder = 1;
+
+    this.regionalPatch = new THREE.Mesh(patchGeo, this.regionalMaterial);
+    this.regionalPatch.renderOrder = 1;
+    this.group.add(this.regionalPatch);
   }
 
   /**
@@ -173,10 +217,6 @@ export class Earth {
       this.nightMaterial.uniforms.sunDirection.value.copy(sunDirection);
     }
 
-    // Copy rotation to cloud mesh, add slight offset for cloud movement
-    this.cloudMesh.rotation.copy(this.earthMesh.rotation);
-    this.cloudMesh.rotation.y += deltaTime * 0.001;
-
     // Atmosphere mesh follows Earth
     this.atmosphereMesh.rotation.copy(this.earthMesh.rotation);
 
@@ -184,15 +224,14 @@ export class Earth {
     const atmoOpacity = getAtmosphereOpacity(altitudeKm);
     this.atmosphereMaterial.uniforms.opacity.value = atmoOpacity;
 
-    // Ground plane — sits at Earth's surface, facing the camera
-    const groundOpacity = getGroundPlaneOpacity(altitudeKm);
-    this.groundPlane.visible = groundOpacity > 0;
-    if (this.groundPlane.visible) {
-      this.groundPlane.position.set(0, distFromCenter - altitudeKm, 0);
-      this.groundPlane.rotation.x = Math.PI / 2;
-      const scale = Math.max(1, altitudeKm * 2);
-      this.groundPlane.scale.set(scale, scale, 1);
-      this.groundMaterial.opacity = groundOpacity;
+    // Regional patch — follows Earth rotation, fades with altitude
+    if (this.regionalPatch) {
+      this.regionalPatch.rotation.copy(this.earthMesh.rotation);
+      const patchOpacity = getGroundPlaneOpacity(altitudeKm);
+      this.regionalPatch.visible = patchOpacity > 0;
+      if (this.regionalPatch.visible) {
+        this.regionalMaterial.opacity = patchOpacity;
+      }
     }
   }
 }

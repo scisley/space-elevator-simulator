@@ -47,7 +47,8 @@ export class AdminPanel {
     brightnessSlider.addEventListener('input', () => {
       const val = parseFloat(brightnessSlider.value);
       document.getElementById('admin-star-brightness-val').textContent = val.toFixed(1);
-      if (this.onStarBrightness) this.onStarBrightness(val);
+      // Slider "1.0" = internal 1.3 (the calibrated default)
+      if (this.onStarBrightness) this.onStarBrightness(val * 1.3);
     });
 
     // Restart button

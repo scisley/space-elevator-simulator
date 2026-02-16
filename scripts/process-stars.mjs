@@ -129,15 +129,17 @@ async function main() {
     const z = -RADIUS * cosD * Math.sin(raRad);
 
     // Brightness from magnitude using Pogson's formula
-    // normalizedBrightness = 1.0 for brightest star, decreasing for dimmer
     const brightness = Math.pow(10, -0.4 * mag);
     const brightestFlux = Math.pow(10, -0.4 * brightest);
     const normalizedBrightness = brightness / brightestFlux;
 
-    // Point size: sqrt scaling for perceptual mapping
-    const size = 1.0 + Math.sqrt(normalizedBrightness) * 5.0;
+    // Point size: magnitude-linear with capped range for smoother distribution
+    // pow(0.7) compresses the bright end so the biggest stars don't dominate
+    const magRange = MAG_LIMIT - brightest;
+    const t = (MAG_LIMIT - mag) / magRange;
+    const size = 1.0 + 2.5 * Math.pow(t, 0.7);
 
-    // Color from B-V index
+    // Color from B-V index (spectral type only, no brightness scaling)
     const bv = ciCol !== undefined && cols[ciCol] !== '' ? parseFloat(cols[ciCol]) : NaN;
     const bvVal = isNaN(bv) ? DEFAULT_BV : bv;
     const [r, g, b] = bvToRGB(bvVal);

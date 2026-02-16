@@ -7,9 +7,9 @@ export const EARTH_ROTATION_RATE = 7.2921e-5; // rad/s
 export const SURFACE_GRAVITY = 9.80; // m/s²
 export const G_CONSTANT_SURFACE = SURFACE_GRAVITY; // m/s² at surface
 
-// Anchor point: 0°N, 80°W (Ecuador coast)
+// Anchor point: 0°N, 80°15'W (~10 miles off Ecuador coast)
 export const ANCHOR_LAT = 0;
-export const ANCHOR_LON = -80;
+export const ANCHOR_LON = -80.25;
 
 // Scene scale: 1 unit = 1 km
 export const CABIN_SIZE = { width: 0.01, depth: 0.01, height: 0.004 }; // 10m x 10m x 4m in km
@@ -28,8 +28,8 @@ export const ATMO_VISIBLE_ALT = 50;
 export const ATMO_THICKNESS = 60; // visual thickness in km
 
 // Ground plane fade
-export const GROUND_PLANE_FADE_START = 20;
-export const GROUND_PLANE_FADE_END = 100;
+export const GROUND_PLANE_FADE_START = 50;
+export const GROUND_PLANE_FADE_END = 300;
 
 // Milestones
 export const MILESTONES = [

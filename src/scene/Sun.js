@@ -41,8 +41,9 @@ export class Sun {
     this.group.add(this.glowSprite);
 
     // Directional light owned by the sun
-    this.light = new THREE.DirectionalLight(0xffffff, 1.5);
+    this.light = new THREE.DirectionalLight(0xffffff, 8.0);
     scene.add(this.light);
+
   }
 
   update(sunDirection, altitudeKm) {
