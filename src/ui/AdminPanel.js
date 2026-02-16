@@ -10,15 +10,31 @@ export class AdminPanel {
     // Toggle with backtick
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Backquote') {
-        this.visible = !this.visible;
-        this.el.style.display = this.visible ? 'block' : 'none';
+        if (this.visible) this.hide(); else this.show();
       }
     });
 
     // Set altitude button
+    const altInput = document.getElementById('admin-altitude');
     document.getElementById('admin-set-alt').addEventListener('click', () => {
-      const alt = parseFloat(document.getElementById('admin-altitude').value);
+      const alt = parseFloat(altInput.value);
       if (!isNaN(alt)) adminSetAltitude(alt);
+    });
+
+    // Enter key submits altitude
+    altInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const alt = parseFloat(altInput.value);
+        if (!isNaN(alt)) adminSetAltitude(alt);
+      }
+    });
+
+    // Altitude quick buttons
+    this.el.querySelectorAll('[data-altitude]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const alt = parseFloat(btn.dataset.altitude);
+        adminSetAltitude(alt);
+      });
     });
 
     // Time scale buttons
@@ -55,5 +71,15 @@ export class AdminPanel {
     document.getElementById('admin-restart').addEventListener('click', () => {
       adminRestart();
     });
+  }
+
+  show() {
+    this.visible = true;
+    this.el.style.display = 'block';
+  }
+
+  hide() {
+    this.visible = false;
+    this.el.style.display = 'none';
   }
 }

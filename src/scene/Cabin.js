@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 const RADIUS = 0.005;    // 5m center to vertex (km)
-const H = 0.004;         // 4m height (km)
+const H = 0.006;         // 6m height (km)
 const SIDES = 6;
 
 // Structural dimensions (all in km)
@@ -19,7 +19,7 @@ const TRIM_SIZE = 0.00006;
 const RAIL_RADIUS = 0.00002;
 const RAIL_HEIGHT = 0.001;
 const WIN_WIDTH = 0.00458;
-const WIN_HEIGHT = 0.003;
+const WIN_HEIGHT = 0.005;
 
 export class Cabin {
   constructor(scene) {
@@ -155,11 +155,17 @@ export class Cabin {
     this.group.add(ceilingLight);
     scene.add(new THREE.AmbientLight(0xffffff, 0.05));
 
-    // --- Collision bounds (inscribed circle) ---
-    const inradius = RADIUS * Math.cos(Math.PI / SIDES) - 0.0003;
+    // --- Collision bounds (hex face half-planes) ---
+    const margin = 0.0003; // 30cm from walls
+    const wallInradius = RADIUS * Math.cos(Math.PI / SIDES) - margin;
+    const faces = [];
+    for (let i = 0; i < SIDES; i++) {
+      const a = ((i + 0.5) / SIDES) * Math.PI * 2;
+      faces.push({ nx: Math.cos(a), nz: Math.sin(a) });
+    }
     this.bounds = {
-      minX: -inradius, maxX: inradius,
-      minZ: -inradius, maxZ: inradius,
+      faces,
+      inradius: wallInradius,
       floorY: 0, ceilY: H,
     };
   }

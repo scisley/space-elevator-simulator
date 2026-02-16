@@ -96,12 +96,17 @@ export class FirstPersonController {
       direction.multiplyScalar(this.walkSpeed * deltaTime);
     }
 
-    // Apply horizontal movement with collision
+    // Apply horizontal movement with hex collision
     let newX = this.camera.position.x + direction.x;
     let newZ = this.camera.position.z + direction.z;
 
-    newX = Math.max(bounds.minX, Math.min(bounds.maxX, newX));
-    newZ = Math.max(bounds.minZ, Math.min(bounds.maxZ, newZ));
+    for (const face of bounds.faces) {
+      const dot = newX * face.nx + newZ * face.nz;
+      if (dot > bounds.inradius) {
+        newX -= (dot - bounds.inradius) * face.nx;
+        newZ -= (dot - bounds.inradius) * face.nz;
+      }
+    }
 
     this.camera.position.x = newX;
     this.camera.position.z = newZ;

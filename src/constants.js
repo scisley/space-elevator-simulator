@@ -12,7 +12,7 @@ export const ANCHOR_LAT = 0;
 export const ANCHOR_LON = -80.25;
 
 // Scene scale: 1 unit = 1 km
-export const CABIN_SIZE = { width: 0.01, depth: 0.01, height: 0.004 }; // 10m x 10m x 4m in km
+export const CABIN_SIZE = { width: 0.01, depth: 0.01, height: 0.006 }; // 10m x 10m x 6m in km
 export const EYE_HEIGHT = 0.0017; // 1.7m in km
 
 // Camera

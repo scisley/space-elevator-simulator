@@ -155,10 +155,12 @@ renderer.domElement.addEventListener('click', () => {
 
 controller.controls.addEventListener('lock', () => {
   crosshair.style.display = 'block';
+  adminPanel.hide();
 });
 
 controller.controls.addEventListener('unlock', () => {
   crosshair.style.display = 'none';
+  adminPanel.show();
 });
 
 // Start state polling
