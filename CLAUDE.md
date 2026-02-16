@@ -61,14 +61,17 @@ float nightFactor = 1.0 - smoothstep(-0.15, 0.1, NdotL);
 - `ShaderMaterial` with `toneMapped: false` bypasses tone mapping AND output encoding — if you set `colorSpace = SRGBColorSpace` on its textures, the GPU decodes to linear, but nothing re-encodes to sRGB, producing washed-out results
 - **Rule**: For ShaderMaterial with `toneMapped: false`, do NOT set `colorSpace` on its textures — keep raw sRGB values
 
-### 6. Stars — PointsMaterial Limitations
+### 6. Stars — Real Catalog Data and Rendering
+
+Stars use the HYG v4.1 catalog (~8,920 naked-eye stars, mag ≤ 6.5). Run `npm run process-stars` to regenerate `public/data/stars.json` from the catalog.
 
 `THREE.PointsMaterial` ignores per-vertex size attributes (the `size` property is uniform for all points). Also, ACES filmic tone mapping compresses HDR colors into a narrow range, making all stars look identical.
 
 **Solution**: Custom `ShaderMaterial` with:
 - Per-vertex `starSize` buffer attribute, read via `attribute float starSize` and applied as `gl_PointSize`
 - `toneMapped: false` to prevent ACES from crushing brightness variation
-- Power-law size distribution and color temperature variation for realism
+- Sizes derived from apparent magnitude via Pogson's formula; colors from B-V color index
+- **Flat `gl_PointSize`** (no perspective division) — stars are all on the same sphere at 150,000 km, so perspective scaling produces sub-pixel sizes (~0.002 px) that get discarded on macOS Metal. Use raw size values directly.
 
 ### 7. Additive Blending and Alpha
 
@@ -92,6 +95,29 @@ Camera is at origin, Earth center is at (0, -(R+alt), 0), so nadir direction is 
 
 Sun glow uses a `THREE.Sprite` with `SpriteMaterial`. Setting `depthTest: false` causes it to render through the cable and other objects. Keep `depthTest` enabled (default) and only disable `depthWrite` for glow effects.
 
+## Astronomical Simplifications
+
+The simulation makes deliberate simplifications to the sun and star positions:
+
+### Sun path assumes equinox conditions (no axial tilt)
+
+The sun orbits around Earth's polar axis on the **celestial equator**. This is only physically accurate at the equinoxes (March 20 / September 22). In reality, Earth's 23.44° axial tilt causes the sun's declination to vary ±23.44° over the year — at the June solstice the sun would be 23.44° north of the equator, at December solstice 23.44° south. Implementing this would require specifying a date for the simulation.
+
+### Sun and stars share the same angular velocity
+
+Both use `SUN_ANGULAR_VELOCITY = 2π / SIDEREAL_DAY` (86164.1s). The sun should technically use the **solar day** (86400s). The ~4 minute difference causes the sun to drift ~1°/day against the star background, completing a full circle in one year. For a simulation spanning hours or a few days, this is negligible.
+
+### Star-sun RA alignment is arbitrary
+
+The absolute RA offset between the starfield and the sun is not tied to a real date. This means the constellations visible at night don't correspond to any particular time of year. Nobody will notice unless they check which constellations are overhead at a specific simulation time.
+
+### What would be needed for full date-accuracy
+
+1. A simulation start date (or real-time clock)
+2. Sun declination: `23.44° × sin(2π × (dayOfYear - 81) / 365)`
+3. Sun RA: `~(dayOfYear / 365) × 2π` offset from vernal equinox
+4. Separate angular velocities for sun (solar day) and stars (sidereal day)
+
 ## File Overview
 
 | File | Purpose |
@@ -100,7 +126,8 @@ Sun glow uses a `THREE.Sprite` with `SpriteMaterial`. Setting `depthTest: false`
 | `src/scene/SceneManager.js` | Renderer setup (log depth, tone mapping, bloom) |
 | `src/scene/Earth.js` | Earth day mesh (MeshStandardMaterial) + night overlay (ShaderMaterial, additive) |
 | `src/scene/Sun.js` | Sun mesh + glow sprite + DirectionalLight + Earth occlusion |
-| `src/scene/Stars.js` | Custom ShaderMaterial points with varied size/color |
+| `src/scene/Stars.js` | Real star catalog (HYG v4.1, ~8,920 naked-eye stars) with per-star size/color |
+| `scripts/process-stars.mjs` | Downloads HYG catalog, converts to `public/data/stars.json` |
 | `src/scene/Sky.js` | Atmosphere gradient, dims at night based on sun elevation |
 | `src/scene/Cable.js` | Near cylinder + far line, transparent with renderOrder 2 for night overlay occlusion |
 | `src/scene/Cabin.js` | Hexagonal cabin with glass ceiling/floor, window panels, interior light |

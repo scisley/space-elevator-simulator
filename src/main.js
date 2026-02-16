@@ -50,9 +50,22 @@ setTimeout(() => { clickToEnter.style.display = 'block'; }, 5000);
 const sceneManager = new SceneManager();
 const { scene, camera, renderer } = sceneManager;
 
+// --- Polar axis (needed by Stars and sun orbit) ---
+// Earth's polar axis in world space: apply same rotation as Earth.js does to (0,1,0)
+// Earth.js applies: rotation.y = -(ANCHOR_LON_RAD + PI/2), then rotation.x = -PI/2
+// The Euler rotation applied to the Earth mesh rotates the north pole direction.
+// We need the world-space direction of Earth's north pole after those rotations.
+// Earth.js sets rotation.x = -PI/2, rotation.y = -(LON+PI/2) with default XYZ order.
+const earthQuaternion = new THREE.Quaternion();
+const earthEulerXYZ = new THREE.Euler(-Math.PI / 2, -(ANCHOR_LON_RAD + Math.PI / 2), 0, 'XYZ');
+earthQuaternion.setFromEuler(earthEulerXYZ);
+
+// The polar axis (north pole) in model space is +Y. After Earth's rotation it becomes:
+const polarAxis = new THREE.Vector3(0, 1, 0).applyQuaternion(earthQuaternion).normalize();
+
 // Create scene objects
 const earth = new Earth(scene, loadingManager);
-const stars = new Stars(scene, loadingManager);
+const stars = new Stars(scene, loadingManager, polarAxis);
 const sky = new Sky(scene);
 const sun = new Sun(scene);
 const cabin = new Cabin(scene);
@@ -79,18 +92,8 @@ adminPanel.onToggleCabin = () => {
   cabin.setVisible(cabinVisible);
 };
 
-// --- Sun orbit setup ---
-// Earth's polar axis in world space: apply same rotation as Earth.js does to (0,1,0)
-// Earth.js applies: rotation.y = -(ANCHOR_LON_RAD + PI/2), then rotation.x = -PI/2
-// The Euler rotation applied to the Earth mesh rotates the north pole direction.
-// We need the world-space direction of Earth's north pole after those rotations.
-// Earth.js sets rotation.x = -PI/2, rotation.y = -(LON+PI/2) with default XYZ order.
-const earthQuaternion = new THREE.Quaternion();
-const earthEulerXYZ = new THREE.Euler(-Math.PI / 2, -(ANCHOR_LON_RAD + Math.PI / 2), 0, 'XYZ');
-earthQuaternion.setFromEuler(earthEulerXYZ);
-
-// The polar axis (north pole) in model space is +Y. After Earth's rotation it becomes:
-const polarAxis = new THREE.Vector3(0, 1, 0).applyQuaternion(earthQuaternion).normalize();
+// Star brightness slider
+adminPanel.onStarBrightness = (val) => stars.setBrightnessMultiplier(val);
 
 // Build two perpendicular basis vectors in the sun's orbital plane (perpendicular to polar axis)
 // Use cross product with a non-parallel vector to get the first basis

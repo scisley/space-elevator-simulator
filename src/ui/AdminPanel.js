@@ -5,6 +5,7 @@ export class AdminPanel {
     this.el = document.getElementById('admin-panel');
     this.visible = false;
     this.onToggleCabin = null;
+    this.onStarBrightness = null;
 
     // Toggle with backtick
     document.addEventListener('keydown', (e) => {
@@ -39,6 +40,14 @@ export class AdminPanel {
     // Toggle cabin
     document.getElementById('admin-toggle-cabin').addEventListener('click', () => {
       if (this.onToggleCabin) this.onToggleCabin();
+    });
+
+    // Star brightness slider
+    const brightnessSlider = document.getElementById('admin-star-brightness');
+    brightnessSlider.addEventListener('input', () => {
+      const val = parseFloat(brightnessSlider.value);
+      document.getElementById('admin-star-brightness-val').textContent = val.toFixed(1);
+      if (this.onStarBrightness) this.onStarBrightness(val);
     });
 
     // Restart button
