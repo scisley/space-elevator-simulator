@@ -50,8 +50,18 @@ export class Sky {
     scene.add(this.mesh);
   }
 
-  update(altitudeKm) {
-    const factor = getSkyBlendFactor(altitudeKm);
+  update(altitudeKm, sunDirection) {
+    let factor = getSkyBlendFactor(altitudeKm);
+
+    // Dim sky at night based on sun elevation
+    if (sunDirection) {
+      // sunDirection.y is the sun's elevation component in world space
+      // (positive = above horizon from elevator's perspective)
+      const sunElevation = sunDirection.y;
+      const daytimeFactor = THREE.MathUtils.smoothstep(sunElevation, -0.1, 0.15);
+      factor *= daytimeFactor;
+    }
+
     this.material.uniforms.blendFactor.value = factor;
     this.mesh.visible = factor > 0.001;
   }

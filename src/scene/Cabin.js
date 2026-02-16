@@ -47,7 +47,7 @@ export class Cabin {
     hexShape.moveTo(verts[0].x, verts[0].z);
     for (let i = 1; i < SIDES; i++) hexShape.lineTo(verts[i].x, verts[i].z);
     hexShape.closePath();
-    const ceiling = new THREE.Mesh(new THREE.ShapeGeometry(hexShape), wallMat);
+    const ceiling = new THREE.Mesh(new THREE.ShapeGeometry(hexShape), glassMat);
     ceiling.rotation.x = -Math.PI / 2;
     ceiling.position.y = H;
     this.group.add(ceiling);
@@ -119,10 +119,7 @@ export class Cabin {
     const ceilingLight = new THREE.PointLight(0xccddff, 0.5, 0.04);
     ceilingLight.position.set(0, H - 0.0003, 0);
     this.group.add(ceilingLight);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.3));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-    sun.position.set(100, 50, 80);
-    scene.add(sun);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.05));
 
     // Collision — inscribed circle
     const inradius = RADIUS * Math.cos(Math.PI / SIDES) - 0.0003;

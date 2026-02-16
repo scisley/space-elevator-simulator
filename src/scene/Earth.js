@@ -10,10 +10,8 @@ export class Earth {
 
     const texLoader = new THREE.TextureLoader(loadingManager);
 
-    // Earth sphere
+    // Earth sphere — use MeshStandardMaterial for correct rendering pipeline
     const earthGeo = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
-
-    // Day/night shader material
     const dayMap = texLoader.load('/textures/2k_earth_daymap.jpg');
     dayMap.colorSpace = THREE.SRGBColorSpace;
 
@@ -23,6 +21,56 @@ export class Earth {
 
     this.earthMesh = new THREE.Mesh(earthGeo, this.earthMaterial);
     this.group.add(this.earthMesh);
+
+    // Night lights overlay — separate mesh, additive blending
+    // Offset by 5 km to avoid z-fighting with the day mesh (log depth buffer needs margin)
+    const nightGeo = new THREE.SphereGeometry(EARTH_RADIUS + 5, 64, 64);
+    const nightMap = texLoader.load('/textures/2k_earth_nightmap.jpg');
+    // No colorSpace — keep raw sRGB values since toneMapped=false bypasses encoding
+
+    this.nightMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        nightTexture: { value: nightMap },
+        sunDirection: { value: new THREE.Vector3(0, 1, 0) },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vViewNormal;
+        void main() {
+          vUv = uv;
+          vViewNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D nightTexture;
+        uniform vec3 sunDirection;
+        varying vec2 vUv;
+        varying vec3 vViewNormal;
+        void main() {
+          vec3 normal = normalize(vViewNormal);
+          vec3 sunDirView = normalize((viewMatrix * vec4(sunDirection, 0.0)).xyz);
+          float NdotL = dot(normal, sunDirView);
+
+          // Show city lights only on the dark side
+          // smoothstep requires edge0 < edge1; invert via 1.0 - smoothstep
+          float nightFactor = 1.0 - smoothstep(-0.15, 0.1, NdotL);
+
+          vec4 nightColor = texture2D(nightTexture, vUv);
+          vec3 lights = nightColor.rgb * nightFactor * 3.0;
+
+          gl_FragColor = vec4(lights, 1.0);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+    });
+
+    this.nightMesh = new THREE.Mesh(nightGeo, this.nightMaterial);
+    this.group.add(this.nightMesh);
 
     // Cloud layer
     const cloudGeo = new THREE.SphereGeometry(EARTH_RADIUS + 10, 64, 64);
@@ -100,42 +148,34 @@ export class Earth {
     });
     this.groundPlane = new THREE.Mesh(groundGeo, this.groundMaterial);
     this.group.add(this.groundPlane);
-
-    // Sun direction — position so Ecuador/anchor is in daytime
   }
 
   /**
    * Update Earth position/effects based on altitude.
-   * Camera stays at origin; Earth group moves to keep Earth at correct distance.
    * @param {number} altitudeKm - current altitude above surface
    * @param {number} deltaTime - time since last frame in seconds
+   * @param {THREE.Vector3} sunDirection - normalized world-space sun direction
    */
-  update(altitudeKm, deltaTime) {
-    // Position Earth so the camera (at origin) is at the correct altitude
-    // Anchor is at 0°N, 80°W on Earth's surface
-    // Cable goes radially outward from anchor point
-    // Camera at origin, Earth center below at distance (EARTH_RADIUS + altitudeKm)
-
-    // Cable direction: radially outward from Earth center at anchor point
-    // In world coords: camera at origin looking out window,
-    // Earth is "below" (negative Y in the world)
+  update(altitudeKm, deltaTime, sunDirection) {
     const distFromCenter = EARTH_RADIUS + altitudeKm;
     this.group.position.set(0, -distFromCenter, 0);
 
     // Rotate Earth so anchor point faces upward (toward camera)
-    // Default sphere has +Y as north pole, texture wraps with lon=0 at +Z
-    // We need to rotate so that (lat=0, lon=-80°) on the sphere points toward +Y
     this.earthMesh.rotation.set(0, 0, 0);
-    // Rotate around Y axis to bring the right longitude to face up
-    // The sphere UV maps with lon=0 at the +X/+Z seam
-    // To get lon=-80° facing +Y, we rotate around the Earth's polar axis
     this.earthMesh.rotation.y = -(ANCHOR_LON_RAD + Math.PI / 2);
-    // Then tilt so equator (lat=0) is at the top
     this.earthMesh.rotation.x = -Math.PI / 2;
+
+    // Night overlay follows same rotation
+    this.nightMesh.rotation.copy(this.earthMesh.rotation);
+
+    // Update sun direction uniform for night overlay
+    if (sunDirection) {
+      this.nightMaterial.uniforms.sunDirection.value.copy(sunDirection);
+    }
 
     // Copy rotation to cloud mesh, add slight offset for cloud movement
     this.cloudMesh.rotation.copy(this.earthMesh.rotation);
-    this.cloudMesh.rotation.y += deltaTime * 0.001; // slow cloud drift
+    this.cloudMesh.rotation.y += deltaTime * 0.001;
 
     // Atmosphere mesh follows Earth
     this.atmosphereMesh.rotation.copy(this.earthMesh.rotation);
@@ -148,9 +188,8 @@ export class Earth {
     const groundOpacity = getGroundPlaneOpacity(altitudeKm);
     this.groundPlane.visible = groundOpacity > 0;
     if (this.groundPlane.visible) {
-      this.groundPlane.position.set(0, distFromCenter - altitudeKm, 0); // relative to group, at surface
-      this.groundPlane.rotation.x = Math.PI / 2; // face upward in group space (which is toward camera)
-      // Scale ground plane based on altitude for appropriate coverage
+      this.groundPlane.position.set(0, distFromCenter - altitudeKm, 0);
+      this.groundPlane.rotation.x = Math.PI / 2;
       const scale = Math.max(1, altitudeKm * 2);
       this.groundPlane.scale.set(scale, scale, 1);
       this.groundMaterial.opacity = groundOpacity;

@@ -40,6 +40,12 @@ export const MILESTONES = [
   { altitude: 100000, label: 'Counterweight Station', sublabel: '100,000 km' },
 ];
 
+// Sun / day-night cycle
+export const SIDEREAL_DAY_S = 86164.1;  // 23h 56m 4.1s
+export const SUN_ANGULAR_VELOCITY = (2 * Math.PI) / SIDEREAL_DAY_S;
+export const SUN_DISTANCE = 149000;      // just inside starfield sphere (150k)
+export const SUN_VISUAL_RADIUS = 2000;   // angular size ~0.77°
+
 // Poll interval for server state (ms)
 export const STATE_POLL_INTERVAL = 5000;
 

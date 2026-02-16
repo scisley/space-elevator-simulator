@@ -11,10 +11,11 @@ const state = {
   startTimeMs: Date.now(),
   lastPollTime: 0,
   serverAvailable: false,
+  timeScale: 1,
 };
 
 function computeAltitude(s, now) {
-  const elapsedHours = (now - s.startTimeMs) / 3_600_000;
+  const elapsedHours = (now - s.startTimeMs) / 3_600_000 * s.timeScale;
   const alt = s.startAltitudeKm + s.direction * s.speedKmh * elapsedHours;
   return Math.max(0, Math.min(CABLE_LENGTH, alt));
 }
@@ -97,6 +98,14 @@ export async function adminSetDirection(direction) {
     if (res.ok) { await pollServer(); return; }
   } catch { /* fall through */ }
   setLocalSegment(currentAlt, state.speedKmh, direction);
+}
+
+export function adminSetTimeScale(scale) {
+  // Snapshot current altitude so changing scale doesn't cause a position jump
+  const currentAlt = computeAltitude(state, Date.now());
+  state.startAltitudeKm = currentAlt;
+  state.startTimeMs = Date.now();
+  state.timeScale = scale;
 }
 
 export async function adminRestart() {

@@ -11,16 +11,21 @@ export class Cable {
 
     // Nearby cable segment — visible cylinder that extends above and below
     const nearGeo = new THREE.CylinderGeometry(0.00015, 0.00015, 0.2, 8); // 15cm radius, 200m tall
-    const nearMat = new THREE.MeshBasicMaterial({ color: 0x999999 });
+    const nearMat = new THREE.MeshBasicMaterial({
+      color: 0x999999,
+      transparent: true,
+      depthWrite: true,
+    });
     this.nearCable = new THREE.Mesh(nearGeo, nearMat);
     this.nearCable.position.x = CABLE_X;
+    this.nearCable.renderOrder = 2;
     this.group.add(this.nearCable);
 
     // Far cable — a line extending the full length
     const farMat = new THREE.LineBasicMaterial({
-      color: 0x888888,
+      color: 0xaaaaaa,
       transparent: true,
-      opacity: 0.6,
+      depthWrite: true,
     });
 
     const altitudes = [0, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000,
@@ -29,6 +34,7 @@ export class Cable {
 
     const geo = new THREE.BufferGeometry().setFromPoints(points);
     this.farCable = new THREE.Line(geo, farMat);
+    this.farCable.renderOrder = 2;
     this.group.add(this.farCable);
   }
 

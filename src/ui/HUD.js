@@ -6,13 +6,15 @@ export class HUD {
     this.lastUpdate = 0;
   }
 
-  update(state) {
+  update(state, simElapsedSeconds) {
     const now = performance.now();
     if (now - this.lastUpdate < 100) return; // throttle to 10 fps
     this.lastUpdate = now;
 
     const alt = state.altitudeKm;
     const speed = state.speedKmh;
+    const timeScale = state.timeScale || 1;
+    const effectiveSpeed = speed * timeScale;
     const gEff = state.effectiveGravityG;
     const dir = state.direction;
 
@@ -25,27 +27,33 @@ export class HUD {
     else if (alt < 1000) altStr = `${alt.toFixed(1)} km`;
     else altStr = `${alt.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} km`;
 
-    // ETA calculations
+    // ETA calculations (using effective speed with time scale)
     let etaGeo = '';
     let etaTop = '';
     if (dir === 1 && alt < GEO_ALTITUDE) {
-      const hoursToGeo = (GEO_ALTITUDE - alt) / speed;
+      const hoursToGeo = (GEO_ALTITUDE - alt) / effectiveSpeed;
       etaGeo = formatDuration(hoursToGeo);
     }
     if (dir === 1 && alt < CABLE_LENGTH) {
-      const hoursToTop = (CABLE_LENGTH - alt) / speed;
+      const hoursToTop = (CABLE_LENGTH - alt) / effectiveSpeed;
       etaTop = formatDuration(hoursToTop);
     }
     if (dir === -1 && alt > 0) {
-      const hoursToBottom = alt / speed;
+      const hoursToBottom = alt / effectiveSpeed;
       etaGeo = `Ground: ${formatDuration(hoursToBottom)}`;
     }
 
+    const timeLabel = timeScale > 1 ? ` <span class="unit">(${timeScale}x)</span>` : '';
+
+    // Format simulation elapsed time
+    const simTime = formatSimTime(simElapsedSeconds || 0);
+
     this.el.innerHTML = `
       <div><span class="label">ALT </span><span class="value">${altStr}</span></div>
-      <div><span class="label">SPD </span><span class="value">${formatSpeed(speed)}</span></div>
+      <div><span class="label">SPD </span><span class="value">${formatSpeed(effectiveSpeed)}</span>${timeLabel}</div>
       <div><span class="label">DIR </span><span class="value" style="color:${dirColor}">${dirLabel}</span></div>
       <div><span class="label">G   </span><span class="value">${gEff.toFixed(3)}</span><span class="unit"> g</span></div>
+      <div><span class="label">SIM </span><span class="value">${simTime}</span></div>
       ${etaGeo ? `<div><span class="label">ETA GEO </span><span class="value">${etaGeo}</span></div>` : ''}
       ${etaTop ? `<div><span class="label">ETA TOP </span><span class="value">${etaTop}</span></div>` : ''}
     `;
@@ -56,6 +64,19 @@ function formatSpeed(kmh) {
   if (kmh >= 1000000) return `${(kmh / 1000000).toFixed(1)}M km/h`;
   if (kmh >= 1000) return `${(kmh / 1000).toFixed(0)}K km/h`;
   return `${kmh} km/h`;
+}
+
+function formatSimTime(totalSeconds) {
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = Math.floor(totalSeconds % 60);
+
+  const pad = (n) => String(n).padStart(2, '0');
+  if (days > 0) {
+    return `${days}d ${pad(hours)}:${pad(minutes)}:${pad(secs)}`;
+  }
+  return `${pad(hours)}:${pad(minutes)}:${pad(secs)}`;
 }
 
 function formatDuration(hours) {

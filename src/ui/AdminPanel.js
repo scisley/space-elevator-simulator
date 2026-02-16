@@ -1,4 +1,4 @@
-import { adminSetAltitude, adminSetSpeed, adminSetDirection, adminRestart } from '../simulation/state.js';
+import { adminSetAltitude, adminSetSpeed, adminSetDirection, adminSetTimeScale, adminRestart } from '../simulation/state.js';
 
 export class AdminPanel {
   constructor() {
@@ -20,11 +20,11 @@ export class AdminPanel {
       if (!isNaN(alt)) adminSetAltitude(alt);
     });
 
-    // Speed preset buttons
-    this.el.querySelectorAll('[data-speed]').forEach(btn => {
+    // Time scale buttons
+    this.el.querySelectorAll('[data-timescale]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const speed = parseInt(btn.dataset.speed);
-        adminSetSpeed(speed);
+        const scale = parseInt(btn.dataset.timescale);
+        adminSetTimeScale(scale);
       });
     });
 
