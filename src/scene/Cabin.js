@@ -1,127 +1,161 @@
 import * as THREE from 'three';
 
-const RADIUS = 0.005;    // 5m center to vertex
-const H = 0.004;         // 4m height
+const RADIUS = 0.005;    // 5m center to vertex (km)
+const H = 0.004;         // 4m height (km)
 const SIDES = 6;
+
+// Structural dimensions (all in km)
+const HUB_RADIUS = 0.0006;
+const HUB_THICKNESS = 0.00015;
+const RIB_SIZE = 0.00012;
+const SILL_HEIGHT = 0.0001;
+const SILL_DEPTH = 0.00012;
+const GLASS_INSET = 0.00002;
+const LED_HEIGHT = 0.00004;
+const PILLAR_SIZE = 0.0003;
+const PLATE_HEIGHT = 0.0005;
+const PLATE_DEPTH = 0.00008;
+const TRIM_SIZE = 0.00006;
+const RAIL_RADIUS = 0.00002;
+const RAIL_HEIGHT = 0.001;
+const WIN_WIDTH = 0.00458;
+const WIN_HEIGHT = 0.003;
 
 export class Cabin {
   constructor(scene) {
     this.group = new THREE.Group();
     scene.add(this.group);
 
-    const wallMat = new THREE.MeshStandardMaterial({
-      color: 0x556677,
-      metalness: 0.7,
-      roughness: 0.3,
-      side: THREE.DoubleSide,
+    // --- Materials ---
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0x2a2a2e,
+      metalness: 0.92,
+      roughness: 0.18,
     });
 
-    const frameMat = new THREE.MeshStandardMaterial({
-      color: 0x778899,
-      metalness: 0.8,
-      roughness: 0.2,
-      emissive: 0x223344,
-      emissiveIntensity: 0.2,
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: 0x3d3d42,
+      metalness: 0.85,
+      roughness: 0.30,
+      emissive: 0x111118,
+      emissiveIntensity: 1.0,
     });
 
     const glassMat = new THREE.MeshPhysicalMaterial({
-      color: 0xaaddff,
+      color: 0xd4efe8,
       transparent: true,
-      opacity: 0.06,
-      transmission: 0.98,
+      opacity: 0.05,
+      transmission: 0.97,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
 
-    const ft = 0.0001; // 10cm trim
+    const emissiveMat = new THREE.MeshBasicMaterial({
+      color: 0x88ccff,
+    });
 
-    // Hex vertices
+    // --- Hex vertices ---
     const verts = [];
     for (let i = 0; i < SIDES; i++) {
       const a = (i / SIDES) * Math.PI * 2;
       verts.push({ x: Math.cos(a) * RADIUS, z: Math.sin(a) * RADIUS });
     }
 
-    // Ceiling — solid hex
-    const hexShape = new THREE.Shape();
-    hexShape.moveTo(verts[0].x, verts[0].z);
-    for (let i = 1; i < SIDES; i++) hexShape.lineTo(verts[i].x, verts[i].z);
-    hexShape.closePath();
-    const ceiling = new THREE.Mesh(new THREE.ShapeGeometry(hexShape), glassMat);
-    ceiling.rotation.x = -Math.PI / 2;
-    ceiling.position.y = H;
-    this.group.add(ceiling);
+    // --- Endcaps (floor & ceiling, symmetrical) ---
+    this._buildEndcap(0, +1, verts, frameMat, glassMat, emissiveMat);
+    this._buildEndcap(H, -1, verts, frameMat, glassMat, emissiveMat);
 
-    // No floor — fully transparent (just glass)
-    const floor = new THREE.Mesh(new THREE.ShapeGeometry(hexShape), glassMat);
-    floor.rotation.x = -Math.PI / 2;
-    this.group.add(floor);
-
-    // Window config
-    const winBottom = H * 0.25;
-    const winTop = H * 0.85;
-    const winH = winTop - winBottom;
-    const winPad = 0.15; // fraction of side length padding on each side
+    // --- Walls ---
+    const sideLen = RADIUS; // regular hexagon: side length = circumradius
 
     for (let i = 0; i < SIDES; i++) {
       const v1 = verts[i];
       const v2 = verts[(i + 1) % SIDES];
       const mx = (v1.x + v2.x) / 2;
       const mz = (v1.z + v2.z) / 2;
-      const dx = v2.x - v1.x;
-      const dz = v2.z - v1.z;
-      const sideLen = Math.sqrt(dx * dx + dz * dz);
-
-      // Outward-facing rotation: normal from center to edge midpoint
       const faceAngle = Math.atan2(mx, mz);
 
-      const winW = sideLen * (1 - 2 * winPad);
-      const padW = sideLen * winPad;
+      // Tangent (along edge) and inward normal directions
+      const tx = Math.cos(faceAngle);
+      const tz = -Math.sin(faceAngle);
+      const ix = -Math.sin(faceAngle);
+      const iz = -Math.cos(faceAngle);
 
-      // 4 wall panels around window:
-      // Bottom strip (full width, below window)
-      this.addPanel(mx, mz, faceAngle, sideLen, winBottom, 0, winBottom / 2, wallMat);
-      // Top strip (full width, above window)
-      this.addPanel(mx, mz, faceAngle, sideLen, H - winTop, 0, winTop + (H - winTop) / 2, wallMat);
-      // Left strip (window height, left of window)
-      this.addPanel(mx, mz, faceAngle, padW, winH, -(sideLen - padW) / 2, winBottom + winH / 2, wallMat);
-      // Right strip (window height, right of window)
-      this.addPanel(mx, mz, faceAngle, padW, winH, (sideLen - padW) / 2, winBottom + winH / 2, wallMat);
+      // Bottom sill plate
+      this._addBeam(mx, PLATE_HEIGHT / 2, mz,
+        sideLen, PLATE_HEIGHT, PLATE_DEPTH, faceAngle, accentMat);
 
-      // Glass window
-      this.addPanel(mx, mz, faceAngle, winW, winH, 0, winBottom + winH / 2, glassMat);
+      // Top sill plate
+      this._addBeam(mx, H - PLATE_HEIGHT / 2, mz,
+        sideLen, PLATE_HEIGHT, PLATE_DEPTH, faceAngle, accentMat);
 
-      // Window trim
-      const trimOffsets = [
-        // horizontal top
-        { w: winW + ft * 2, h: ft, ox: 0, oy: winTop },
-        // horizontal bottom
-        { w: winW + ft * 2, h: ft, ox: 0, oy: winBottom },
-      ];
-      for (const t of trimOffsets) {
-        this.addPanel(mx, mz, faceAngle, t.w, t.h, t.ox, t.oy, frameMat);
-      }
+      // Glass window (centered vertically between sill plates)
+      const winCenterY = H / 2;
+      this._addPanel(mx, mz, faceAngle, WIN_WIDTH, WIN_HEIGHT, 0, winCenterY, glassMat);
 
-      // Vertical trim left/right of window
-      this.addPanel(mx, mz, faceAngle, ft, winH, -winW / 2, winBottom + winH / 2, frameMat);
-      this.addPanel(mx, mz, faceAngle, ft, winH, winW / 2, winBottom + winH / 2, frameMat);
+      // Window trim — 4 beams framing the window
+      const winBottom = winCenterY - WIN_HEIGHT / 2;
+      const winTop = winCenterY + WIN_HEIGHT / 2;
 
-      // Corner pillar
+      // Horizontal bottom trim
+      this._addBeam(mx, winBottom, mz,
+        WIN_WIDTH + TRIM_SIZE * 2, TRIM_SIZE, TRIM_SIZE, faceAngle, accentMat);
+      // Horizontal top trim
+      this._addBeam(mx, winTop, mz,
+        WIN_WIDTH + TRIM_SIZE * 2, TRIM_SIZE, TRIM_SIZE, faceAngle, accentMat);
+      // Vertical left trim
+      this._addBeam(
+        mx + tx * (-WIN_WIDTH / 2), winCenterY, mz + tz * (-WIN_WIDTH / 2),
+        TRIM_SIZE, WIN_HEIGHT, TRIM_SIZE, faceAngle, accentMat);
+      // Vertical right trim
+      this._addBeam(
+        mx + tx * (WIN_WIDTH / 2), winCenterY, mz + tz * (WIN_WIDTH / 2),
+        TRIM_SIZE, WIN_HEIGHT, TRIM_SIZE, faceAngle, accentMat);
+
+      // Corner pillar at vertex i
       const pillar = new THREE.Mesh(
-        new THREE.BoxGeometry(ft * 1.5, H, ft * 1.5),
+        new THREE.BoxGeometry(PILLAR_SIZE, H, PILLAR_SIZE),
         frameMat
       );
       pillar.position.set(v1.x, H / 2, v1.z);
       this.group.add(pillar);
+
+      // Handrails — floor and ceiling (symmetrical)
+      const railInset = PLATE_DEPTH / 2 + RAIL_RADIUS * 3;
+      const railX = mx + ix * railInset;
+      const railZ = mz + iz * railInset;
+      const railLen = sideLen - PILLAR_SIZE;
+      const edgeDir = new THREE.Vector3(v2.x - v1.x, 0, v2.z - v1.z).normalize();
+      const bracketSize = RAIL_RADIUS * 3;
+
+      for (const railY of [RAIL_HEIGHT, H - RAIL_HEIGHT]) {
+        const railGeo = new THREE.CylinderGeometry(RAIL_RADIUS, RAIL_RADIUS, railLen, 8);
+        const rail = new THREE.Mesh(railGeo, accentMat);
+        rail.position.set(railX, railY, railZ);
+        rail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), edgeDir);
+        this.group.add(rail);
+
+        for (const sign of [-1, 1]) {
+          const bx = mx + tx * sign * (railLen / 2) + ix * railInset / 2;
+          const bz = mz + tz * sign * (railLen / 2) + iz * railInset / 2;
+          const bracket = new THREE.Mesh(
+            new THREE.BoxGeometry(bracketSize, bracketSize, railInset),
+            accentMat
+          );
+          bracket.position.set(bx, railY, bz);
+          bracket.rotation.y = faceAngle;
+          this.group.add(bracket);
+        }
+      }
     }
 
-    // Lighting
-    const ceilingLight = new THREE.PointLight(0xccddff, 0.5, 0.04);
+    // --- Lighting ---
+    const ceilingLight = new THREE.PointLight(0xccddff, 0.8, 0.02);
     ceilingLight.position.set(0, H - 0.0003, 0);
     this.group.add(ceilingLight);
     scene.add(new THREE.AmbientLight(0xffffff, 0.05));
 
-    // Collision — inscribed circle
+    // --- Collision bounds (inscribed circle) ---
     const inradius = RADIUS * Math.cos(Math.PI / SIDES) - 0.0003;
     this.bounds = {
       minX: -inradius, maxX: inradius,
@@ -130,13 +164,98 @@ export class Cabin {
     };
   }
 
-  // Place a panel on a hex wall face.
-  // (mx,mz) = edge midpoint, faceAngle = outward normal angle,
-  // w/h = panel size, offsetX = lateral offset along edge, y = center height
-  addPanel(mx, mz, faceAngle, w, h, offsetX, y, mat) {
+  _buildEndcap(y, inward, verts, frameMat, glassMat, emissiveMat) {
+    // inward: +1 for floor (interior above), -1 for ceiling (interior below)
+
+    // 1. Central hub — hexagonal disc
+    const hubGeo = new THREE.CylinderGeometry(HUB_RADIUS, HUB_RADIUS, HUB_THICKNESS, 6);
+    const hub = new THREE.Mesh(hubGeo, frameMat);
+    hub.position.set(0, y, 0);
+    this.group.add(hub);
+
+    for (let i = 0; i < SIDES; i++) {
+      const v = verts[i];
+      const vNext = verts[(i + 1) % SIDES];
+      const a = (i / SIDES) * Math.PI * 2;
+      const aNext = ((i + 1) / SIDES) * Math.PI * 2;
+
+      // Hub edge point in this vertex's direction
+      const hx = Math.cos(a) * HUB_RADIUS;
+      const hz = Math.sin(a) * HUB_RADIUS;
+
+      // 2. Radial rib — hub edge to corner vertex
+      const ribDx = v.x - hx;
+      const ribDz = v.z - hz;
+      const ribLen = Math.sqrt(ribDx * ribDx + ribDz * ribDz);
+      const ribAngle = Math.atan2(ribDx, ribDz);
+
+      const ribGeo = new THREE.BoxGeometry(RIB_SIZE, RIB_SIZE, ribLen);
+      const rib = new THREE.Mesh(ribGeo, frameMat);
+      rib.position.set((hx + v.x) / 2, y, (hz + v.z) / 2);
+      rib.rotation.y = ribAngle;
+      this.group.add(rib);
+
+      // 3. Perimeter sill beam (connecting adjacent corners)
+      const emx = (v.x + vNext.x) / 2;
+      const emz = (v.z + vNext.z) / 2;
+      const edx = vNext.x - v.x;
+      const edz = vNext.z - v.z;
+      const edgeLen = Math.sqrt(edx * edx + edz * edz);
+      const edgeAngle = Math.atan2(edx, edz);
+
+      const beamGeo = new THREE.BoxGeometry(SILL_DEPTH, SILL_HEIGHT, edgeLen);
+      const beam = new THREE.Mesh(beamGeo, frameMat);
+      beam.position.set(emx, y, emz);
+      beam.rotation.y = edgeAngle;
+      this.group.add(beam);
+
+      // 4. Glass panel (quad between two ribs and perimeter beam)
+      const hubInset = HUB_RADIUS + RIB_SIZE;
+      const hxCur = Math.cos(a) * hubInset;
+      const hzCur = Math.sin(a) * hubInset;
+      const hxNext = Math.cos(aNext) * hubInset;
+      const hzNext = Math.sin(aNext) * hubInset;
+
+      const shape = new THREE.Shape();
+      shape.moveTo(hxCur, hzCur);
+      shape.lineTo(v.x, v.z);
+      shape.lineTo(vNext.x, vNext.z);
+      shape.lineTo(hxNext, hzNext);
+      shape.closePath();
+
+      const glass = new THREE.Mesh(new THREE.ShapeGeometry(shape), glassMat);
+      glass.rotation.x = -Math.PI / 2;
+      glass.position.y = y + inward * GLASS_INSET;
+      this.group.add(glass);
+
+      // 6. LED edge strip (along wall junction)
+      const faceAngle = Math.atan2(emx, emz);
+      const stripGeo = new THREE.BoxGeometry(edgeLen * 0.8, LED_HEIGHT, 0.00003);
+      const strip = new THREE.Mesh(stripGeo, emissiveMat);
+      strip.position.set(emx, y + inward * LED_HEIGHT / 2, emz);
+      strip.rotation.y = faceAngle;
+      this.group.add(strip);
+    }
+
+    // 5. Hub accent ring
+    const ringGeo = new THREE.TorusGeometry(HUB_RADIUS, 0.00003, 8, 6);
+    const ring = new THREE.Mesh(ringGeo, emissiveMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(0, y + inward * (HUB_THICKNESS / 2 + 0.00001), 0);
+    this.group.add(ring);
+  }
+
+  _addBeam(x, y, z, width, height, depth, faceAngle, mat) {
+    const geo = new THREE.BoxGeometry(width, height, depth);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    mesh.rotation.y = faceAngle;
+    this.group.add(mesh);
+  }
+
+  _addPanel(mx, mz, faceAngle, w, h, offsetX, y, mat) {
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-    // Offset along the edge direction (perpendicular to outward normal)
-    const edgeDirX = Math.cos(faceAngle);  // edge runs perpendicular to face normal
+    const edgeDirX = Math.cos(faceAngle);
     const edgeDirZ = -Math.sin(faceAngle);
     plane.position.set(
       mx + edgeDirX * offsetX,
