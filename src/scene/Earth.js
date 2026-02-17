@@ -123,12 +123,22 @@ export class Earth {
         varying vec3 vPosition;
         void main() {
           vec3 viewDir = normalize(-vPosition);
-          // Flip normal for BackSide — without this, dot is always ≤ 0
-          // and rim = 1.0 everywhere, flooding the entire disc with glow
+          // Flip normal for BackSide
           vec3 normal = -normalize(vNormal);
           float rim = 1.0 - max(dot(viewDir, normal), 0.0);
-          float glow = pow(rim, 3.0) * 1.5;
-          gl_FragColor = vec4(glowColor, glow * opacity);
+
+          // Blend two Fresnel layers for a soft gradual falloff:
+          // - Tight inner band (bright limb glow)
+          // - Wide outer haze (subtle fade into space)
+          float innerGlow = pow(rim, 4.0) * 1.2;
+          float outerHaze = pow(rim, 1.5) * 0.25;
+          float glow = innerGlow + outerHaze;
+
+          // Color gradient: brighter/whiter near the limb, deeper blue further out
+          vec3 limbColor = vec3(0.55, 0.75, 1.0);
+          vec3 color = mix(glowColor, limbColor, pow(rim, 3.0));
+
+          gl_FragColor = vec4(color, glow * opacity);
         }
       `,
       transparent: true,

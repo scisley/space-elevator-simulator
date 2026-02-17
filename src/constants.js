@@ -25,7 +25,7 @@ export const SKY_FADE_END = 100;
 
 // Atmosphere glow
 export const ATMO_VISIBLE_ALT = 50;
-export const ATMO_THICKNESS = 60; // visual thickness in km
+export const ATMO_THICKNESS = 120; // visual thickness in km
 
 // Ground plane fade
 export const GROUND_PLANE_FADE_START = 50;
