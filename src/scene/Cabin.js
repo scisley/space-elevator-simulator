@@ -168,6 +168,7 @@ export class Cabin {
       inradius: wallInradius,
       floorY: 0, ceilY: H,
     };
+
   }
 
   _buildEndcap(y, inward, verts, frameMat, glassMat, emissiveMat) {

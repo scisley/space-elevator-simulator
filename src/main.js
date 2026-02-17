@@ -83,6 +83,7 @@ const eastDir = new THREE.Vector3().crossVectors(polarAxis, new THREE.Vector3(0,
 camera.position.copy(eastDir.clone().multiplyScalar(0.001)); // 1m = 0.001 km
 camera.position.y = EYE_HEIGHT;
 camera.lookAt(camera.position.x + eastDir.x, EYE_HEIGHT, camera.position.z + eastDir.z);
+controller.initYawFromCamera();
 
 // UI
 const hud = new HUD();
@@ -209,7 +210,7 @@ function animate() {
   prevAltitude = altitudeKm;
 
   // Update HUD
-  hud.update(state, simElapsedSeconds);
+  hud.update(state, simElapsedSeconds, controller);
 
   // Render
   sceneManager.render();

@@ -78,6 +78,7 @@ export class Stars {
       });
 
       this.points = new THREE.Points(geometry, this.material);
+      this.points.renderOrder = -1; // render before sky so sky's alpha occludes stars
       this.group.add(this.points);
     });
   }

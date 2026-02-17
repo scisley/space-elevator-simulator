@@ -1,4 +1,4 @@
-import { GEO_ALTITUDE, CABLE_LENGTH } from '../constants.js';
+import { GEO_ALTITUDE, CABLE_LENGTH, MAG_BOOTS_THRESHOLD } from '../constants.js';
 
 export class HUD {
   constructor() {
@@ -6,7 +6,7 @@ export class HUD {
     this.lastUpdate = 0;
   }
 
-  update(state, simElapsedSeconds) {
+  update(state, simElapsedSeconds, controller) {
     const now = performance.now();
     if (now - this.lastUpdate < 100) return; // throttle to 10 fps
     this.lastUpdate = now;
@@ -48,14 +48,45 @@ export class HUD {
     // Format simulation elapsed time
     const simTime = formatSimTime(simElapsedSeconds || 0);
 
+    // Gravity display: color-code and direction arrow
+    const gAbs = Math.abs(gEff);
+    let gColor, gArrow;
+    if (gEff < -0.0005) {
+      gColor = '#e4f';  // magenta = reversed
+      gArrow = '&#8593;'; // up arrow
+    } else if (gAbs < 0.005) {
+      gColor = '#f44';  // red = micro-g
+      gArrow = '&#183;'; // middle dot
+    } else if (gAbs < 0.05) {
+      gColor = '#fa4';  // orange = very low
+      gArrow = '&#8595;'; // down arrow
+    } else if (gAbs < 0.5) {
+      gColor = '#ff4';  // yellow = low
+      gArrow = '&#8595;';
+    } else {
+      gColor = '#4f4';  // green = normal
+      gArrow = '&#8595;';
+    }
+
+    // Mag boots prompt
+    let bootsLine = '';
+    if (controller) {
+      if (controller.magBootsHeld) {
+        bootsLine = `<div><span class="value" style="color:#4af">MAG BOOTS ACTIVE</span></div>`;
+      } else if (gAbs < MAG_BOOTS_THRESHOLD && !controller.onFloor && !controller.onCeiling) {
+        bootsLine = `<div><span class="value" style="color:#ff4">[HOLD G] MAG BOOTS</span></div>`;
+      }
+    }
+
     this.el.innerHTML = `
       <div><span class="label">ALT </span><span class="value">${altStr}</span></div>
       <div><span class="label">SPD </span><span class="value">${formatSpeed(effectiveSpeed)}</span>${timeLabel}</div>
       <div><span class="label">DIR </span><span class="value" style="color:${dirColor}">${dirLabel}</span></div>
-      <div><span class="label">G   </span><span class="value">${gEff.toFixed(3)}</span><span class="unit"> g</span></div>
+      <div><span class="label">G   </span><span class="value" style="color:${gColor}">${gArrow} ${gEff.toFixed(3)}</span><span class="unit"> g</span></div>
       <div><span class="label">SIM </span><span class="value">${simTime}</span></div>
       ${etaGeo ? `<div><span class="label">ETA GEO </span><span class="value">${etaGeo}</span></div>` : ''}
       ${etaTop ? `<div><span class="label">ETA TOP </span><span class="value">${etaTop}</span></div>` : ''}
+      ${bootsLine}
     `;
   }
 }
