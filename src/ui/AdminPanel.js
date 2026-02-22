@@ -7,6 +7,8 @@ export class AdminPanel {
     this.onToggleCabin = null;
     this.onStarBrightness = null;
     this.onToggleAudio = null;
+    this.onEnterSandbox = null;
+    this.onReturnToRealtime = null;
     this.cabinVisible = true;
     this.starBrightnessVal = 1.0;
 
@@ -81,9 +83,9 @@ export class AdminPanel {
       this.shareLink();
     });
 
-    // Restart button
+    // Return to Real-time button
     document.getElementById('admin-restart').addEventListener('click', () => {
-      adminRestart();
+      if (this.onReturnToRealtime) this.onReturnToRealtime();
     });
   }
 
@@ -108,6 +110,7 @@ export class AdminPanel {
   }
 
   show() {
+    if (getState().mode === 'realtime' && this.onEnterSandbox) this.onEnterSandbox();
     this.visible = true;
     this.el.style.display = 'block';
   }

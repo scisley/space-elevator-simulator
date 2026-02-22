@@ -194,8 +194,43 @@ In `Earth.js`, the tile bounds are converted to Three.js SphereGeometry `phi`/`t
 - If >50% of tiles fail, graceful degradation (no patch, only 8K globe)
 - The patch uses `MeshStandardMaterial` with `alphaMap` for edge fading, `transparent: true`, `renderOrder: 1`
 - `onBeforeCompile` ocean boost is applied to the patch material (same as globe) for consistent ocean color
-- 0.01 km radial offset avoids z-fighting with the day mesh in the log depth buffer (0.5 km was too large — visible layer transition at start of ride)
+- 0.005 km radial offset avoids z-fighting with the day mesh in the log depth buffer (0.5 km was too large — visible layer transition at start of ride; 0.01 km was tried but is above the cabin floor at ground station — the platform covers it, so 0.005 km works cleanly)
 - Fades out between 50–300 km altitude (constants `GROUND_PLANE_FADE_START` / `GROUND_PLANE_FADE_END`)
+
+## Ground Station and Anchor Platform
+
+`GROUND_STATION_ALTITUDE = 0.01 km` (10m) is the elevator's resting height above the ocean. This is important for three reasons:
+
+1. **Z-fighting**: The cabin floor doesn't clip with the Earth surface or the satellite patch.
+2. **Patch clearance**: `PATCH_ALTITUDE_OFFSET = 0.005 km` (5m) places the hi-res tile patch below the cabin floor at ground station. The AnchorStation deck covers the seam.
+3. **Realism**: Real cable cars would anchor some distance above sea level.
+
+The AnchorStation is an 80m×80m deck with 4 corner pylons. Its deck top is at `GROUND_STATION_ALTITUDE - 0.0005 km` (9.5m) — 50cm below the cabin floor glass, so you look down through the floor and see the deck. The AnchorStation moves with Earth (`position.y = -altitudeKm`) and is hidden above 50 km.
+
+All simulation modes start the elevator at `GROUND_STATION_ALTITUDE`, not 0. The sandbox "GND" quick-jump button uses `0.01` not `0`.
+
+### Sandbox mode start timing
+
+When the sandbox button is clicked on the loading screen, `adminRestart()` is called immediately. This resets `state.startTimeMs = Date.now()`. Without this, the elevator would already be partway up if the user lingered on the loading screen before clicking Sandbox (since `startTimeMs` was set at page load).
+
+## Mode System and AdminPanel
+
+The simulation has three modes stored in `state.mode`: `'realtime'`, `'sandbox'`, `'cinema'`.
+
+**AdminPanel** (`src/ui/AdminPanel.js`) can be opened in any mode (ESC or backtick). Opening it while in realtime mode triggers `onEnterSandbox` → calls `adminSetAltitude(currentAltitude)` to freeze position and switch to sandbox. The "Return to Real-time" button re-syncs to UTC via `adminReturnToRealtime()`.
+
+Key callbacks on the AdminPanel instance:
+- `onEnterSandbox()` — called when panel opens in realtime mode
+- `onReturnToRealtime()` — called when "Return to Real-time" is clicked
+- `onToggleCabin()`, `onStarBrightness(val)`, `onToggleAudio()` — feature controls
+
+### About overlay
+
+A full-screen overlay (`#about-overlay`, z-index 1500) contains four sections: What is a Space Elevator, How This Simulation Works, Features, and About the Author. It can be opened from:
+- The loading screen ("ABOUT THIS SIMULATION" link below mode buttons)
+- The settings panel ("About" button at the bottom)
+
+Closing: click "✕ CLOSE" or press ESC (handled by inline script in `index.html`, independent of `main.js`).
 
 ## File Overview
 
@@ -212,7 +247,8 @@ In `Earth.js`, the tile bounds are converted to Three.js SphereGeometry `phi`/`t
 | `src/scene/Sky.js` | Atmosphere gradient, dims at night based on sun elevation |
 | `src/scene/Cable.js` | Near cylinder + far line, transparent with renderOrder 2 for night overlay occlusion |
 | `src/scene/Cabin.js` | Hexagonal cabin with glass ceiling/floor, window panels, interior light |
-| `src/constants.js` | Physical constants (Earth radius, sun orbit, sidereal day, etc.) |
-| `src/simulation/state.js` | Altitude computation, timeScale, state management |
-| `src/ui/HUD.js` | Altitude, speed, g-force, simulation time display |
-| `src/ui/AdminPanel.js` | Time scale, altitude teleport, direction controls |
+| `src/constants.js` | Physical constants (Earth radius, sun orbit, sidereal day, `GROUND_STATION_ALTITUDE`, etc.) |
+| `src/simulation/state.js` | Altitude computation, timeScale, mode management, realtime↔sandbox transitions |
+| `src/ui/HUD.js` | Altitude, speed, g-force, simulation time; permanent ESC hint; multi-shadow text outline for readability |
+| `src/ui/AdminPanel.js` | Settings panel; openable in any mode; transitions realtime→sandbox on open; share link, cabin/audio/star controls |
+| `index.html` | Loading screen, mode buttons, settings panel HTML, about overlay content/CSS, mobile detection |

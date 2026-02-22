@@ -8,7 +8,7 @@ const EARTH_ROTATION_RATE = 7.2921e-5;
 const DEFAULT_STATE = {
   startAltitudeKm: 0,
   startTimeMs: Date.now(),
-  speedKmh: 190,
+  speedKmh: 300, // keep in sync with DEFAULT_SPEED_KMH in src/constants.js
   direction: 1,
 };
 

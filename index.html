@@ -1,213 +1,595 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Space Elevator Simulator</title>
-  <meta name="description" content="Ride a space elevator from sea level to 100,000 km. Real star catalog, real physics, day/night cycle — in your browser.">
-  <meta name="theme-color" content="#000000">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Space Elevator Simulator</title>
+    <meta
+      name="description"
+      content="Ride a space elevator from sea level to 100,000 km. Real star catalog, real physics, day/night cycle — in your browser."
+    />
+    <meta name="theme-color" content="#000000" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-  <!-- Open Graph -->
-  <meta property="og:title" content="Space Elevator Simulator">
-  <meta property="og:description" content="Ride a space elevator from sea level to 100,000 km. Real star catalog, real physics, day/night cycle — in your browser.">
-  <meta property="og:image" content="https://space-elevator-simulator.vercel.app/og-image.jpg">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:type" content="website">
+    <!-- Open Graph -->
+    <meta property="og:title" content="Space Elevator Simulator" />
+    <meta
+      property="og:description"
+      content="Ride a space elevator from sea level to 100,000 km. Real star catalog, real physics, day/night cycle — in your browser."
+    />
+    <meta
+      property="og:image"
+      content="https://space-elevator-simulator.vercel.app/og-image.jpg"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:type" content="website" />
 
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Space Elevator Simulator">
-  <meta name="twitter:description" content="Ride a space elevator from sea level to 100,000 km. Real star catalog, real physics, day/night cycle — in your browser.">
-  <meta name="twitter:image" content="https://space-elevator-simulator.vercel.app/og-image.jpg">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Space Elevator Simulator" />
+    <meta
+      name="twitter:description"
+      content="Ride a space elevator from sea level to 100,000 km. Real star catalog, real physics, day/night cycle — in your browser."
+    />
+    <meta
+      name="twitter:image"
+      content="https://space-elevator-simulator.vercel.app/og-image.jpg"
+    />
 
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
-    canvas { display: block; }
-
-    #loading-screen {
-      position: fixed; inset: 0; z-index: 1000;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: #000; color: #fff; font-family: 'Courier New', monospace;
-    }
-    #loading-screen h1 { font-size: 2rem; margin-bottom: 1rem; letter-spacing: 0.3em; }
-    #loading-bar-container {
-      width: 300px; height: 4px; background: #333; border-radius: 2px; overflow: hidden;
-    }
-    #loading-bar { width: 0%; height: 100%; background: #4af; transition: width 0.3s; }
-    #loading-text { margin-top: 1rem; font-size: 0.8rem; color: #888; }
-    #click-to-enter {
-      margin-top: 2rem; font-size: 1.1rem; color: #4af; cursor: pointer;
-      animation: pulse 2s infinite; display: none;
-    }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-    #hud {
-      position: fixed; top: 20px; left: 20px; z-index: 100;
-      font-family: 'Courier New', monospace; color: #4af; font-size: 14px;
-      pointer-events: none; user-select: none; text-shadow: 0 0 4px rgba(0,0,0,0.8);
-    }
-    #hud .label { color: #888; }
-    #hud .value { color: #fff; }
-    #hud .unit { color: #666; }
-    #hud div { margin-bottom: 4px; }
-
-    #milestone-notification {
-      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      z-index: 200; font-family: 'Courier New', monospace; text-align: center;
-      pointer-events: none; opacity: 0; transition: opacity 1s;
-    }
-    #milestone-notification .altitude { font-size: 1.5rem; color: #4af; }
-    #milestone-notification .name { font-size: 2.5rem; color: #fff; margin-top: 0.5rem; }
-
-    #admin-panel {
-      position: fixed; top: 20px; right: 20px; z-index: 300;
-      background: rgba(0,0,0,0.85); border: 1px solid #4af; border-radius: 8px;
-      padding: 16px; font-family: 'Courier New', monospace; color: #fff;
-      min-width: 260px; display: none;
-    }
-    #admin-panel h3 { color: #4af; margin-bottom: 12px; font-size: 14px; }
-    #admin-panel label { display: block; color: #888; font-size: 11px; margin-top: 8px; }
-    #admin-panel input {
-      width: 100%; background: #111; border: 1px solid #333; color: #fff;
-      padding: 4px 8px; font-family: inherit; font-size: 12px; margin-top: 2px;
-    }
-    #admin-panel button {
-      background: #1a3a5c; border: 1px solid #4af; color: #4af; padding: 4px 10px;
-      font-family: inherit; font-size: 11px; cursor: pointer; margin: 2px;
-    }
-    #admin-panel button:hover { background: #2a5a8c; }
-    #admin-panel .btn-row { margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap; }
-
-    #crosshair {
-      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 2px; height: 2px; background: rgba(255,255,255,0.5); border-radius: 50%;
-      z-index: 50; pointer-events: none; display: none;
-    }
-
-    /* Mobile landing page */
-    #mobile-landing {
-      position: fixed; inset: 0; z-index: 2000;
-      display: none; flex-direction: column; align-items: center; justify-content: center;
-      background: #000 url('/og-image.jpg') center/cover no-repeat;
-      font-family: 'Courier New', monospace; color: #fff; text-align: center;
-      padding: 2rem;
-    }
-    #mobile-landing::before {
-      content: ''; position: absolute; inset: 0;
-      background: rgba(0,0,0,0.7);
-    }
-    #mobile-landing > * { position: relative; z-index: 1; }
-    #mobile-landing h1 { font-size: 1.8rem; letter-spacing: 0.3em; margin-bottom: 1rem; }
-    #mobile-landing .subtitle { color: #4af; font-size: 0.95rem; margin-bottom: 1.5rem; line-height: 1.6; }
-    #mobile-landing .stats { color: #888; font-size: 0.75rem; margin-bottom: 2rem; letter-spacing: 0.1em; }
-    #mobile-landing .cta { color: #fff; font-size: 0.9rem; margin-bottom: 1.5rem; }
-    #mobile-landing .copy-link {
-      background: #1a3a5c; border: 1px solid #4af; color: #4af;
-      padding: 12px 24px; font-family: inherit; font-size: 0.9rem;
-      cursor: pointer; letter-spacing: 0.1em;
-    }
-    #mobile-landing .copy-link:active { background: #2a5a8c; }
-  </style>
-</head>
-<body>
-  <div id="mobile-landing">
-    <h1>SPACE ELEVATOR</h1>
-    <div class="subtitle">A first-person journey from<br>sea level to 100,000 km</div>
-    <div class="stats">Real star catalog &middot; Real physics &middot; 14 milestones</div>
-    <div class="cta">Open on a computer for the full experience</div>
-    <button class="copy-link" id="mobile-copy-link">COPY LINK</button>
-  </div>
-
-  <div id="loading-screen">
-    <h1>SPACE ELEVATOR</h1>
-    <div id="loading-bar-container"><div id="loading-bar"></div></div>
-    <div id="loading-text">Loading textures...</div>
-    <div id="click-to-enter">[ CLICK TO ENTER ]</div>
-  </div>
-
-  <div id="crosshair"></div>
-
-  <div id="hud"></div>
-
-  <div id="milestone-notification">
-    <div class="altitude"></div>
-    <div class="name"></div>
-  </div>
-
-  <div id="admin-panel">
-    <h3>SETTINGS</h3>
-    <label>Altitude (km)</label>
-    <div class="btn-row">
-      <button data-altitude="0">0</button>
-      <button data-altitude="1000">1k</button>
-      <button data-altitude="10000">10k</button>
-      <button data-altitude="35780">GEO</button>
-      <button data-altitude="50000">50k</button>
-      <button data-altitude="100000">100k</button>
-    </div>
-    <div class="btn-row">
-      <input type="number" id="admin-altitude" value="0" min="0" max="100000" style="flex:1;">
-      <button id="admin-set-alt">Set</button>
-    </div>
-    <label>Time Scale</label>
-    <div class="btn-row">
-      <button data-timescale="1">1x</button>
-      <button data-timescale="10">10x</button>
-      <button data-timescale="100">100x</button>
-      <button data-timescale="500">500x</button>
-      <button data-timescale="1000">1000x</button>
-      <button data-timescale="10000">10000x</button>
-    </div>
-    <label>Direction</label>
-    <div class="btn-row">
-      <button data-dir="1">Up</button>
-      <button data-dir="0">Stop</button>
-      <button data-dir="-1">Down</button>
-    </div>
-    <label>Cabin</label>
-    <div class="btn-row">
-      <button id="admin-toggle-cabin">Toggle Cabin</button>
-    </div>
-    <label>Star Brightness</label>
-    <div class="btn-row" style="align-items: center;">
-      <input type="range" id="admin-star-brightness" min="0.1" max="3.0" step="0.1" value="1.0"
-             style="flex:1; accent-color:#4af;">
-      <span id="admin-star-brightness-val" style="color:#4af; min-width:30px; text-align:right;">1.0</span>
-    </div>
-    <label>Audio</label>
-    <div class="btn-row">
-      <button id="admin-toggle-audio">Mute</button>
-    </div>
-    <div class="btn-row" style="margin-top:12px">
-      <button id="admin-share" style="flex:1;">Share Link</button>
-      <button id="admin-restart">Restart</button>
-    </div>
-  </div>
-
-  <script>
-    // Mobile detection — runs synchronously before the deferred module script
-    (function() {
-      var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-        || (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
-      if (isMobile) {
-        document.getElementById('mobile-landing').style.display = 'flex';
-        document.getElementById('loading-screen').style.display = 'none';
-        document.getElementById('mobile-copy-link').addEventListener('click', function() {
-          var btn = this;
-          navigator.clipboard.writeText(window.location.href).then(function() {
-            btn.textContent = 'COPIED!';
-            setTimeout(function() { btn.textContent = 'COPY LINK'; }, 2000);
-          });
-        });
-        // Remove the module script so Three.js never loads
-        var appScript = document.getElementById('app-script');
-        if (appScript) appScript.remove();
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-    })();
-  </script>
-  <script type="module" src="/src/main.js" id="app-script"></script>
-</body>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+      canvas {
+        display: block;
+      }
+
+      #loading-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+        color: #fff;
+        font-family: "Courier New", monospace;
+      }
+      #loading-screen h1 {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+        letter-spacing: 0.3em;
+      }
+      #loading-bar-container {
+        width: 300px;
+        height: 4px;
+        background: #333;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      #loading-bar {
+        width: 0%;
+        height: 100%;
+        background: #4af;
+        transition: width 0.3s;
+      }
+      #loading-text {
+        margin-top: 1rem;
+        font-size: 0.8rem;
+        color: #888;
+      }
+      #mode-select {
+        margin-top: 2rem;
+        display: none;
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+      }
+      .mode-btn {
+        background: rgba(20, 40, 60, 0.9);
+        border: 1px solid #4af;
+        color: #fff;
+        padding: 14px 32px;
+        font-family: "Courier New", monospace;
+        font-size: 1rem;
+        cursor: pointer;
+        letter-spacing: 0.15em;
+        min-width: 260px;
+        text-align: center;
+        transition:
+          background 0.2s,
+          border-color 0.2s;
+      }
+      .mode-btn:hover {
+        background: rgba(40, 80, 120, 0.9);
+        border-color: #6cf;
+      }
+      .mode-btn .subtitle {
+        display: block;
+        font-size: 0.65rem;
+        color: #888;
+        margin-top: 4px;
+        letter-spacing: 0.08em;
+      }
+      .mode-btn.coming-soon {
+        border-color: #555;
+        color: #888;
+      }
+      .mode-btn.coming-soon:hover {
+        background: rgba(30, 50, 70, 0.9);
+        border-color: #777;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+
+      #hud {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 100;
+        font-family: "Courier New", monospace;
+        color: #4af;
+        font-size: 14px;
+        pointer-events: none;
+        user-select: none;
+        text-shadow:
+          1px 1px 0 #000,
+          -1px -1px 0 #000,
+          1px -1px 0 #000,
+          -1px 1px 0 #000,
+          0 0 8px rgba(0, 0, 0, 0.9);
+      }
+      #hud .label {
+        color: #888;
+      }
+      #hud .value {
+        color: #fff;
+      }
+      #hud .unit {
+        color: #666;
+      }
+      #hud div {
+        margin-bottom: 4px;
+      }
+
+      #milestone-notification {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 200;
+        font-family: "Courier New", monospace;
+        text-align: center;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 1s;
+      }
+      #milestone-notification .altitude {
+        font-size: 1.5rem;
+        color: #4af;
+      }
+      #milestone-notification .name {
+        font-size: 2.5rem;
+        color: #fff;
+        margin-top: 0.5rem;
+      }
+
+      #admin-panel {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 300;
+        background: rgba(0, 0, 0, 0.85);
+        border: 1px solid #4af;
+        border-radius: 8px;
+        padding: 16px;
+        font-family: "Courier New", monospace;
+        color: #fff;
+        min-width: 260px;
+        display: none;
+      }
+      #admin-panel h3 {
+        color: #4af;
+        margin-bottom: 12px;
+        font-size: 14px;
+      }
+      #admin-panel label {
+        display: block;
+        color: #888;
+        font-size: 11px;
+        margin-top: 8px;
+      }
+      #admin-panel input {
+        width: 100%;
+        background: #111;
+        border: 1px solid #333;
+        color: #fff;
+        padding: 4px 8px;
+        font-family: inherit;
+        font-size: 12px;
+        margin-top: 2px;
+      }
+      #admin-panel button {
+        background: #1a3a5c;
+        border: 1px solid #4af;
+        color: #4af;
+        padding: 4px 10px;
+        font-family: inherit;
+        font-size: 11px;
+        cursor: pointer;
+        margin: 2px;
+      }
+      #admin-panel button:hover {
+        background: #2a5a8c;
+      }
+      #admin-panel .btn-row {
+        margin-top: 8px;
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+
+      #crosshair {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 2px;
+        height: 2px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 50%;
+        z-index: 50;
+        pointer-events: none;
+        display: none;
+      }
+
+      /* Mobile landing page */
+      #mobile-landing {
+        position: fixed;
+        inset: 0;
+        z-index: 2000;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #000 url("/og-image.jpg") center/cover no-repeat;
+        font-family: "Courier New", monospace;
+        color: #fff;
+        text-align: center;
+        padding: 2rem;
+      }
+      #mobile-landing::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+      }
+      #mobile-landing > * {
+        position: relative;
+        z-index: 1;
+      }
+      #mobile-landing h1 {
+        font-size: 1.8rem;
+        letter-spacing: 0.3em;
+        margin-bottom: 1rem;
+      }
+      #mobile-landing .subtitle {
+        color: #4af;
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+      }
+      #mobile-landing .stats {
+        color: #888;
+        font-size: 0.75rem;
+        margin-bottom: 2rem;
+        letter-spacing: 0.1em;
+      }
+      #mobile-landing .cta {
+        color: #fff;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+      }
+      #mobile-landing .copy-link {
+        background: #1a3a5c;
+        border: 1px solid #4af;
+        color: #4af;
+        padding: 12px 24px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        cursor: pointer;
+        letter-spacing: 0.1em;
+      }
+      #mobile-landing .copy-link:active {
+        background: #2a5a8c;
+      }
+
+      /* About overlay */
+      #about-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1500;
+        background: rgba(0, 0, 0, 0.96);
+        overflow-y: auto;
+        display: none;
+        font-family: "Courier New", monospace;
+      }
+      #about-close {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid #4af;
+        color: #4af;
+        font-family: "Courier New", monospace;
+        font-size: 0.8rem;
+        padding: 6px 14px;
+        cursor: pointer;
+        letter-spacing: 0.1em;
+        z-index: 1501;
+      }
+      #about-close:hover {
+        background: rgba(40, 80, 120, 0.8);
+      }
+      .about-inner {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 60px 24px 80px;
+      }
+      .about-inner h2 {
+        font-size: 1.4rem;
+        color: #4af;
+        letter-spacing: 0.3em;
+        margin-bottom: 2.5rem;
+        text-align: center;
+      }
+      .about-inner h3 {
+        font-size: 0.8rem;
+        color: #4af;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        margin-top: 2.5rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid #1a3a5c;
+        padding-bottom: 0.5rem;
+      }
+      .about-inner p {
+        color: #ccc;
+        font-size: 0.82rem;
+        line-height: 1.8;
+        margin-bottom: 1rem;
+      }
+      .about-inner strong { color: #fff; }
+      .about-inner a { color: #4af; text-decoration: underline; }
+      .about-inner a:hover { color: #6cf; }
+      .about-inner ul {
+        list-style: none;
+        padding: 0;
+        margin-bottom: 1rem;
+      }
+      .about-inner ul li {
+        color: #ccc;
+        font-size: 0.82rem;
+        line-height: 1.7;
+        padding: 0.4rem 0 0.4rem 1.4em;
+        position: relative;
+        border-bottom: 1px solid #111;
+      }
+      .about-inner ul li::before {
+        content: "—";
+        position: absolute;
+        left: 0;
+        color: #4af;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="mobile-landing">
+      <h1>SPACE ELEVATOR</h1>
+      <div class="subtitle">
+        A first-person journey from<br />sea level to 100,000 km
+      </div>
+      <div class="stats">
+        Real star catalog &middot; Real physics &middot; 14 milestones
+      </div>
+      <div class="cta">Open on a computer for the full experience</div>
+      <button class="copy-link" id="mobile-copy-link">COPY LINK</button>
+    </div>
+
+    <div id="loading-screen">
+      <h1>SPACE ELEVATOR</h1>
+      <div id="loading-bar-container"><div id="loading-bar"></div></div>
+      <div id="loading-text">Loading textures...</div>
+      <div id="mode-select">
+        <button class="mode-btn" data-mode="realtime">
+          REAL-TIME<span class="subtitle">14 days, synced for everyone</span>
+        </button>
+        <button class="mode-btn" data-mode="sandbox">
+          SANDBOX<span class="subtitle">Choose your own adventure</span>
+        </button>
+        <!-- Cinema mode buttons injected dynamically from CINEMA_MODES -->
+        <button id="loading-about" style="background:none; border:none; color:#555; font-family:'Courier New',monospace; font-size:0.7rem; cursor:pointer; letter-spacing:0.15em; margin-top:8px; text-decoration:underline; padding:4px;">ABOUT THIS SIMULATION</button>
+      </div>
+    </div>
+
+    <div id="crosshair"></div>
+
+    <div id="hud"></div>
+
+    <div id="milestone-notification">
+      <div class="altitude"></div>
+      <div class="name"></div>
+    </div>
+
+    <div id="admin-panel">
+      <h3>SETTINGS</h3>
+      <label>Altitude (km)</label>
+      <div class="btn-row">
+        <button data-altitude="0.01">GND</button>
+        <button data-altitude="1000">1k</button>
+        <button data-altitude="10000">10k</button>
+        <button data-altitude="35780">GEO</button>
+        <button data-altitude="50000">50k</button>
+        <button data-altitude="100000">100k</button>
+      </div>
+      <div class="btn-row">
+        <input
+          type="number"
+          id="admin-altitude"
+          value="0"
+          min="0"
+          max="100000"
+          style="flex: 1"
+        />
+        <button id="admin-set-alt">Set</button>
+      </div>
+      <label>Time Scale</label>
+      <div class="btn-row">
+        <button data-timescale="1">1x</button>
+        <button data-timescale="10">10x</button>
+        <button data-timescale="100">100x</button>
+        <button data-timescale="500">500x</button>
+        <button data-timescale="1000">1000x</button>
+        <button data-timescale="10000">10000x</button>
+      </div>
+      <label>Direction</label>
+      <div class="btn-row">
+        <button data-dir="1">Up</button>
+        <button data-dir="0">Stop</button>
+        <button data-dir="-1">Down</button>
+      </div>
+      <label>Cabin</label>
+      <div class="btn-row">
+        <button id="admin-toggle-cabin">Toggle Cabin</button>
+      </div>
+      <label>Star Brightness</label>
+      <div class="btn-row" style="align-items: center">
+        <input
+          type="range"
+          id="admin-star-brightness"
+          min="0.1"
+          max="3.0"
+          step="0.1"
+          value="1.0"
+          style="flex: 1; accent-color: #4af"
+        />
+        <span
+          id="admin-star-brightness-val"
+          style="color: #4af; min-width: 30px; text-align: right"
+          >1.0</span
+        >
+      </div>
+      <label>Audio</label>
+      <div class="btn-row">
+        <button id="admin-toggle-audio">Mute</button>
+      </div>
+      <div class="btn-row" style="margin-top: 12px">
+        <button id="admin-share" style="flex: 1">Share Link</button>
+        <button id="admin-restart">Return to Real-time</button>
+      </div>
+      <div class="btn-row" style="margin-top: 4px; border-top: 1px solid #1a3a5c; padding-top: 8px;">
+        <button id="admin-about" style="flex: 1; color: #888; border-color: #555;">About</button>
+      </div>
+    </div>
+
+    <div id="about-overlay">
+      <button id="about-close">✕ CLOSE</button>
+      <div class="about-inner">
+        <h2>SPACE ELEVATOR SIMULATOR</h2>
+
+        <h3>What is a Space Elevator?</h3>
+        <p>What would it be like to take an elevator ride into space? It's one of the great thought experiments of aerospace engineering — a cable stretching from Earth's surface all the way to a counterweight at 100,000 km, held taut not by a tower from below, but by centrifugal force pulling the counterweight outward, like a ball on a string. Elevator cars called "climbers" travel up and down the cable, potentially offering cheap, reusable access to space without a single rocket engine.</p>
+        <p>The biggest engineering obstacle is the cable itself. It would need to be stronger than any material we've ever built — carbon nanotubes are the leading candidate, and we can make them in the lab, just not yet in the lengths required.</p>
+        <p><a href="https://en.wikipedia.org/wiki/Space_elevator" target="_blank" rel="noopener noreferrer">Space elevator — Wikipedia ↗</a></p>
+
+        <h3>How This Simulation Works</h3>
+        <p><strong>Real-Time Mode</strong> syncs to the actual UTC clock. At 300 km/h, the elevator takes ~14 days to travel the full 100,000 km to the counterweight station, waits 10 minutes, then descends for another ~14 days — a ~28-day round trip. Every visitor is riding the same elevator at the same position in the cycle. Open the app in a few weeks and it'll be somewhere completely different.</p>
+        <p><strong>Sandbox Mode</strong> gives you full control via the settings panel (ESC key). You can jump to any altitude instantly, set the time scale from 1× up to 10,000× to watch the day/night cycle blur past, reverse direction, or stop mid-cable. A <strong>Share Link</strong> button generates a URL encoding your exact altitude, speed, and direction — useful for sending a friend to a specific view.</p>
+        <p><strong>Cinematic Modes</strong> are pre-programmed journeys — <em>Express Ascent</em> (full trip in 5 minutes) and <em>Ludicrous Speed</em> (ground to GEO in 1 minute) — designed to show off the simulation's full range without waiting two weeks.</p>
+
+        <h3>Features</h3>
+        <ul>
+          <li><strong>Real star catalog</strong> — ~8,900 naked-eye stars from the <a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">HYG v4.1 catalog ↗</a> (Hipparcos, Yale, and Gliese data), with accurate positions, colors, and brightness</li>
+          <li><strong>Live sun movement</strong> — simulates Earth's rotation from the co-rotating frame of the elevator cable</li>
+          <li><strong>Day/night cycle</strong> — city lights visible on the dark side of Earth; atmosphere dims naturally at night</li>
+          <li><strong>Altitude-accurate gravity</strong> — gravity weakens with altitude, crosses zero at geostationary orbit (~35,786 km) as centrifugal force takes over. Magnetic boots activate in low-g regions.</li>
+          <li><strong>Atmosphere rendering</strong> — sky fades from blue to black as you ascend through the stratosphere</li>
+          <li><strong>High-resolution satellite imagery</strong> — regional tiles from <a href="https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api" target="_blank" rel="noopener noreferrer">NASA GIBS ↗</a> provide sharp ground detail at low altitudes</li>
+          <li><strong>Milestone notifications</strong> — named waypoints for Mount Everest, the Kármán Line, ISS orbit, GEO, and more</li>
+        </ul>
+
+        <h3>About the Author</h3>
+        <p>Steve Isley is an engineer and researcher with an unusually wide career path: he started in aerospace engineering at the University of Washington (running the Kirsten Wind Tunnel), earned a Master's from Georgia Tech's Aerospace Systems Design Laboratory, then pivoted to policy and behavioral science with a Ph.D. from the Pardee RAND Graduate School. He has worked as a behavioral scientist at the National Renewable Energy Laboratory and Amazon, and is now focused on AI and sustainability as co-founder of CountOn and an advisor at the Future of Life Foundation. This simulator is a side project.</p>
+        <p><a href="https://www.linkedin.com/in/stevecisley/" target="_blank" rel="noopener noreferrer">Connect on LinkedIn ↗</a></p>
+      </div>
+    </div>
+
+    <script>
+      // Mobile detection — runs synchronously before the deferred module script
+      (function () {
+        var isMobile =
+          /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+          (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
+        if (isMobile) {
+          document.getElementById("mobile-landing").style.display = "flex";
+          document.getElementById("loading-screen").style.display = "none";
+          document
+            .getElementById("mobile-copy-link")
+            .addEventListener("click", function () {
+              var btn = this;
+              navigator.clipboard
+                .writeText(window.location.href)
+                .then(function () {
+                  btn.textContent = "COPIED!";
+                  setTimeout(function () {
+                    btn.textContent = "COPY LINK";
+                  }, 2000);
+                });
+            });
+          // Remove the module script so Three.js never loads
+          var appScript = document.getElementById("app-script");
+          if (appScript) appScript.remove();
+        }
+      })();
+    </script>
+    <script>
+      (function () {
+        var overlay = document.getElementById("about-overlay");
+        function showAbout() {
+          overlay.style.display = "block";
+          overlay.scrollTop = 0;
+        }
+        function hideAbout() {
+          overlay.style.display = "none";
+        }
+        document.getElementById("about-close").addEventListener("click", hideAbout);
+        document.getElementById("admin-about").addEventListener("click", showAbout);
+        document.getElementById("loading-about").addEventListener("click", showAbout);
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && overlay.style.display !== "none") {
+            hideAbout();
+          }
+        });
+      })();
+    </script>
+    <script type="module" src="/src/main.js" id="app-script"></script>
+  </body>
 </html>

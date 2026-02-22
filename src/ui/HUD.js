@@ -18,8 +18,26 @@ export class HUD {
     const gEff = state.effectiveGravityG;
     const dir = state.direction;
 
-    const dirLabel = dir === 1 ? 'ASCENDING' : dir === -1 ? 'DESCENDING' : 'STOPPED';
-    const dirColor = dir === 1 ? '#4af' : dir === -1 ? '#fa4' : '#888';
+    const waitRemainingMs = state.waitRemainingMs || 0;
+    const phase = state.phase;
+
+    let dirLabel, dirColor;
+    if (waitRemainingMs > 0 && phase === 'wait-ground') {
+      dirLabel = 'WAITING AT GROUND';
+      dirColor = '#888';
+    } else if (waitRemainingMs > 0 && phase === 'wait-top') {
+      dirLabel = 'WAITING AT STATION';
+      dirColor = '#888';
+    } else if (dir === 1) {
+      dirLabel = 'ASCENDING';
+      dirColor = '#4af';
+    } else if (dir === -1) {
+      dirLabel = 'DESCENDING';
+      dirColor = '#fa4';
+    } else {
+      dirLabel = 'STOPPED';
+      dirColor = '#888';
+    }
 
     // Format altitude
     let altStr;
@@ -30,6 +48,7 @@ export class HUD {
     // ETA calculations (using effective speed with time scale)
     let etaGeo = '';
     let etaTop = '';
+    let etaGround = '';
     if (dir === 1 && alt < GEO_ALTITUDE) {
       const hoursToGeo = (GEO_ALTITUDE - alt) / effectiveSpeed;
       etaGeo = formatDuration(hoursToGeo);
@@ -40,10 +59,10 @@ export class HUD {
     }
     if (dir === -1 && alt > 0) {
       const hoursToBottom = alt / effectiveSpeed;
-      etaGeo = `Ground: ${formatDuration(hoursToBottom)}`;
+      etaGround = formatDuration(hoursToBottom);
     }
 
-    const timeLabel = timeScale > 1 ? ` <span class="unit">(${timeScale}x)</span>` : '';
+    const timeLabel = timeScale > 1 ? ` <span class="unit">(${parseFloat(timeScale.toFixed(1))}x)</span>` : '';
 
     // Format simulation elapsed time
     const simTime = formatSimTime(simElapsedSeconds || 0);
@@ -78,14 +97,26 @@ export class HUD {
       }
     }
 
+    // Wait countdown
+    let waitLine = '';
+    if (waitRemainingMs > 0) {
+      const totalSec = Math.ceil(waitRemainingMs / 1000);
+      const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+      const ss = String(totalSec % 60).padStart(2, '0');
+      waitLine = `<div><span class="label">DEPARTS IN </span><span class="value" style="color:#4af">${mm}:${ss}</span></div>`;
+    }
+
     this.el.innerHTML = `
+      <div class="label" style="margin-bottom:8px;">ESC &mdash; settings</div>
       <div><span class="label">ALT </span><span class="value">${altStr}</span></div>
       <div><span class="label">SPD </span><span class="value">${formatSpeed(effectiveSpeed)}</span>${timeLabel}</div>
       <div><span class="label">DIR </span><span class="value" style="color:${dirColor}">${dirLabel}</span></div>
       <div><span class="label">G   </span><span class="value" style="color:${gColor}">${gArrow} ${gEff.toFixed(3)}</span><span class="unit"> g</span></div>
       <div><span class="label">SIM </span><span class="value">${simTime}</span></div>
+      ${waitLine}
       ${etaGeo ? `<div><span class="label">ETA GEO </span><span class="value">${etaGeo}</span></div>` : ''}
       ${etaTop ? `<div><span class="label">ETA TOP </span><span class="value">${etaTop}</span></div>` : ''}
+      ${etaGround ? `<div><span class="label">ETA GND </span><span class="value">${etaGround}</span></div>` : ''}
       ${bootsLine}
     `;
   }

@@ -4,8 +4,8 @@ import { getAtmosphereOpacity, getGroundPlaneOpacity } from '../simulation/physi
 import { loadRegionalTexture } from '../loaders/TileLoader.js';
 
 // Offset above Earth surface (km) to avoid z-fighting with the day mesh
-// Keep minimal — log depth buffer handles small gaps well
-const PATCH_ALTITUDE_OFFSET = 0.01;
+// 0.005 km = 5m, sits below the 10m ground station platform
+const PATCH_ALTITUDE_OFFSET = 0.005;
 
 export class Earth {
   // Shared onBeforeCompile hook: boosts dark ocean albedo so it's
