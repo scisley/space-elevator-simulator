@@ -11,8 +11,12 @@ import { OrbitalPlatform } from './scene/OrbitalPlatform.js';
 import { FirstPersonController } from './controls/FirstPersonController.js';
 import { HUD } from './ui/HUD.js';
 import { AdminPanel } from './ui/AdminPanel.js';
-import { getState, updateLocalState, startPolling } from './simulation/state.js';
+import { AmbientAudio } from './scene/Audio.js';
+import { getState, updateLocalState, startPolling, adminSetAltitude, adminSetTimeScale, adminSetDirection } from './simulation/state.js';
 import { EYE_HEIGHT, MILESTONES, ANCHOR_LON_RAD, SUN_ANGULAR_VELOCITY } from './constants.js';
+import { inject } from '@vercel/analytics';
+
+inject();
 
 // Loading
 const loadingScreen = document.getElementById('loading-screen');
@@ -51,16 +55,9 @@ const sceneManager = new SceneManager();
 const { scene, camera, renderer } = sceneManager;
 
 // --- Polar axis (needed by Stars and sun orbit) ---
-// Earth's polar axis in world space: apply same rotation as Earth.js does to (0,1,0)
-// Earth.js applies: rotation.y = -(ANCHOR_LON_RAD + PI/2), then rotation.x = -PI/2
-// The Euler rotation applied to the Earth mesh rotates the north pole direction.
-// We need the world-space direction of Earth's north pole after those rotations.
-// Earth.js sets rotation.x = -PI/2, rotation.y = -(LON+PI/2) with default XYZ order.
 const earthQuaternion = new THREE.Quaternion();
 const earthEulerXYZ = new THREE.Euler(-Math.PI / 2, -(ANCHOR_LON_RAD + Math.PI / 2), 0, 'XYZ');
 earthQuaternion.setFromEuler(earthEulerXYZ);
-
-// The polar axis (north pole) in model space is +Y. After Earth's rotation it becomes:
 const polarAxis = new THREE.Vector3(0, 1, 0).applyQuaternion(earthQuaternion).normalize();
 
 // Create scene objects
@@ -78,12 +75,14 @@ const controller = new FirstPersonController(camera, renderer.domElement);
 controller.setBounds(cabin.getBounds());
 
 // Camera initial position — 1m east of cable, facing east
-// East at anchor = cross(up, polarAxis) (perpendicular to radial and polar)
 const eastDir = new THREE.Vector3().crossVectors(polarAxis, new THREE.Vector3(0, 1, 0)).normalize();
 camera.position.copy(eastDir.clone().multiplyScalar(0.001)); // 1m = 0.001 km
 camera.position.y = EYE_HEIGHT;
 camera.lookAt(camera.position.x + eastDir.x, EYE_HEIGHT, camera.position.z + eastDir.z);
 controller.initYawFromCamera();
+
+// Audio
+const audio = new AmbientAudio();
 
 // UI
 const hud = new HUD();
@@ -95,13 +94,36 @@ cabin.setVisible(cabinVisible);
 adminPanel.onToggleCabin = () => {
   cabinVisible = !cabinVisible;
   cabin.setVisible(cabinVisible);
+  adminPanel.cabinVisible = cabinVisible;
 };
 
 // Star brightness slider
 adminPanel.onStarBrightness = (val) => stars.setBrightnessMultiplier(val);
 
-// Build two perpendicular basis vectors in the sun's orbital plane (perpendicular to polar axis)
-// Use cross product with a non-parallel vector to get the first basis
+// Audio mute toggle
+adminPanel.onToggleAudio = () => {
+  if (!audio.started) audio.start();
+  const muted = audio.toggleMute();
+  adminPanel.setAudioButtonText(muted);
+};
+
+// --- URL deep links ---
+const params = new URLSearchParams(window.location.search);
+if (params.has('alt')) adminSetAltitude(parseFloat(params.get('alt')));
+if (params.has('speed')) adminSetTimeScale(parseInt(params.get('speed')));
+if (params.has('dir')) adminSetDirection(parseInt(params.get('dir')));
+if (params.has('cabin') && params.get('cabin') === '0') {
+  cabinVisible = false;
+  cabin.setVisible(false);
+  adminPanel.cabinVisible = false;
+}
+if (params.has('stars')) {
+  const v = parseFloat(params.get('stars'));
+  stars.setBrightnessMultiplier(v * 1.3);
+  adminPanel.starBrightnessVal = v;
+}
+
+// Build two perpendicular basis vectors in the sun's orbital plane
 const tempVec = Math.abs(polarAxis.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
 const basisA = new THREE.Vector3().crossVectors(polarAxis, tempVec).normalize();
 const basisB = new THREE.Vector3().crossVectors(polarAxis, basisA).normalize();
@@ -122,7 +144,6 @@ function checkMilestones(altitudeKm) {
     const key = m.altitude;
     if (triggeredMilestones.has(key)) continue;
 
-    // Trigger when we cross the milestone altitude (within 1% or 1km)
     const threshold = Math.max(m.altitude * 0.01, 1);
     if (Math.abs(altitudeKm - m.altitude) < threshold) {
       triggeredMilestones.add(key);
@@ -146,6 +167,8 @@ function showMilestone(m) {
 clickToEnter.addEventListener('click', () => {
   loadingScreen.style.display = 'none';
   controller.lock();
+  // Start audio on first user interaction
+  if (!audio.started) audio.start();
 });
 
 renderer.domElement.addEventListener('click', () => {
@@ -204,6 +227,9 @@ function animate() {
   cable.update(altitudeKm);
   anchor.update(altitudeKm, delta);
   platform.update(altitudeKm);
+
+  // Update audio
+  audio.update(altitudeKm);
 
   // Check milestones
   checkMilestones(altitudeKm);

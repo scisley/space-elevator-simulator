@@ -4,6 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Space Elevator Simulator</title>
+  <meta name="description" content="Ride a space elevator from sea level to 100,000 km. Real star catalog, real physics, day/night cycle — in your browser.">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Space Elevator Simulator">
+  <meta property="og:description" content="Ride a space elevator from sea level to 100,000 km. Real star catalog, real physics, day/night cycle — in your browser.">
+  <meta property="og:image" content="https://space-elevator.vercel.app/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:type" content="website">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Space Elevator Simulator">
+  <meta name="twitter:description" content="Ride a space elevator from sea level to 100,000 km. Real star catalog, real physics, day/night cycle — in your browser.">
+  <meta name="twitter:image" content="https://space-elevator.vercel.app/og-image.jpg">
+
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
@@ -68,9 +86,41 @@
       width: 2px; height: 2px; background: rgba(255,255,255,0.5); border-radius: 50%;
       z-index: 50; pointer-events: none; display: none;
     }
+
+    /* Mobile landing page */
+    #mobile-landing {
+      position: fixed; inset: 0; z-index: 2000;
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      background: #000 url('/og-image.jpg') center/cover no-repeat;
+      font-family: 'Courier New', monospace; color: #fff; text-align: center;
+      padding: 2rem;
+    }
+    #mobile-landing::before {
+      content: ''; position: absolute; inset: 0;
+      background: rgba(0,0,0,0.7);
+    }
+    #mobile-landing > * { position: relative; z-index: 1; }
+    #mobile-landing h1 { font-size: 1.8rem; letter-spacing: 0.3em; margin-bottom: 1rem; }
+    #mobile-landing .subtitle { color: #4af; font-size: 0.95rem; margin-bottom: 1.5rem; line-height: 1.6; }
+    #mobile-landing .stats { color: #888; font-size: 0.75rem; margin-bottom: 2rem; letter-spacing: 0.1em; }
+    #mobile-landing .cta { color: #fff; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    #mobile-landing .copy-link {
+      background: #1a3a5c; border: 1px solid #4af; color: #4af;
+      padding: 12px 24px; font-family: inherit; font-size: 0.9rem;
+      cursor: pointer; letter-spacing: 0.1em;
+    }
+    #mobile-landing .copy-link:active { background: #2a5a8c; }
   </style>
 </head>
 <body>
+  <div id="mobile-landing">
+    <h1>SPACE ELEVATOR</h1>
+    <div class="subtitle">A first-person journey from<br>sea level to 100,000 km</div>
+    <div class="stats">Real star catalog &middot; Real physics &middot; 14 milestones</div>
+    <div class="cta">Open on a computer for the full experience</div>
+    <button class="copy-link" id="mobile-copy-link">COPY LINK</button>
+  </div>
+
   <div id="loading-screen">
     <h1>SPACE ELEVATOR</h1>
     <div id="loading-bar-container"><div id="loading-bar"></div></div>
@@ -88,7 +138,7 @@
   </div>
 
   <div id="admin-panel">
-    <h3>ADMIN CONTROLS</h3>
+    <h3>SETTINGS</h3>
     <label>Altitude (km)</label>
     <div class="btn-row">
       <button data-altitude="0">0</button>
@@ -127,11 +177,37 @@
              style="flex:1; accent-color:#4af;">
       <span id="admin-star-brightness-val" style="color:#4af; min-width:30px; text-align:right;">1.0</span>
     </div>
+    <label>Audio</label>
+    <div class="btn-row">
+      <button id="admin-toggle-audio">Mute</button>
+    </div>
     <div class="btn-row" style="margin-top:12px">
+      <button id="admin-share" style="flex:1;">Share Link</button>
       <button id="admin-restart">Restart</button>
     </div>
   </div>
 
-  <script type="module" src="/src/main.js"></script>
+  <script>
+    // Mobile detection — runs synchronously before the deferred module script
+    (function() {
+      var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+        || (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
+      if (isMobile) {
+        document.getElementById('mobile-landing').style.display = 'flex';
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('mobile-copy-link').addEventListener('click', function() {
+          var btn = this;
+          navigator.clipboard.writeText(window.location.href).then(function() {
+            btn.textContent = 'COPIED!';
+            setTimeout(function() { btn.textContent = 'COPY LINK'; }, 2000);
+          });
+        });
+        // Remove the module script so Three.js never loads
+        var appScript = document.getElementById('app-script');
+        if (appScript) appScript.remove();
+      }
+    })();
+  </script>
+  <script type="module" src="/src/main.js" id="app-script"></script>
 </body>
 </html>

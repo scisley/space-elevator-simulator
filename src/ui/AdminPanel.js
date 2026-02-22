@@ -1,4 +1,4 @@
-import { adminSetAltitude, adminSetSpeed, adminSetDirection, adminSetTimeScale, adminRestart } from '../simulation/state.js';
+import { adminSetAltitude, adminSetSpeed, adminSetDirection, adminSetTimeScale, adminRestart, getState } from '../simulation/state.js';
 
 export class AdminPanel {
   constructor() {
@@ -6,6 +6,9 @@ export class AdminPanel {
     this.visible = false;
     this.onToggleCabin = null;
     this.onStarBrightness = null;
+    this.onToggleAudio = null;
+    this.cabinVisible = true;
+    this.starBrightnessVal = 1.0;
 
     // Toggle with backtick
     document.addEventListener('keydown', (e) => {
@@ -62,15 +65,46 @@ export class AdminPanel {
     const brightnessSlider = document.getElementById('admin-star-brightness');
     brightnessSlider.addEventListener('input', () => {
       const val = parseFloat(brightnessSlider.value);
+      this.starBrightnessVal = val;
       document.getElementById('admin-star-brightness-val').textContent = val.toFixed(1);
       // Slider "1.0" = internal 1.3 (the calibrated default)
       if (this.onStarBrightness) this.onStarBrightness(val * 1.3);
+    });
+
+    // Audio mute toggle
+    document.getElementById('admin-toggle-audio').addEventListener('click', () => {
+      if (this.onToggleAudio) this.onToggleAudio();
+    });
+
+    // Share button
+    document.getElementById('admin-share').addEventListener('click', () => {
+      this.shareLink();
     });
 
     // Restart button
     document.getElementById('admin-restart').addEventListener('click', () => {
       adminRestart();
     });
+  }
+
+  shareLink() {
+    const state = getState();
+    const url = new URL(window.location.origin + window.location.pathname);
+    url.searchParams.set('alt', Math.round(state.altitudeKm));
+    if (state.timeScale !== 1) url.searchParams.set('speed', state.timeScale);
+    if (state.direction !== 1) url.searchParams.set('dir', state.direction);
+    if (!this.cabinVisible) url.searchParams.set('cabin', '0');
+    if (this.starBrightnessVal !== 1.0) url.searchParams.set('stars', this.starBrightnessVal.toFixed(1));
+
+    const btn = document.getElementById('admin-share');
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Share Link'; }, 2000);
+    });
+  }
+
+  setAudioButtonText(muted) {
+    document.getElementById('admin-toggle-audio').textContent = muted ? 'Unmute' : 'Mute';
   }
 
   show() {
