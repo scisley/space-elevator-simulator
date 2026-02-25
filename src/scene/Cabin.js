@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { quality } from '../QualitySettings.js';
 
 const RADIUS = 0.005;    // 5m center to vertex (km)
 const H = 0.006;         // 6m height (km)
@@ -41,14 +42,22 @@ export class Cabin {
       emissiveIntensity: 1.0,
     });
 
-    const glassMat = new THREE.MeshPhysicalMaterial({
-      color: 0xd4efe8,
-      transparent: true,
-      opacity: 0.05,
-      transmission: 0.97,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    });
+    const glassMat = quality.usePhysicalGlass
+      ? new THREE.MeshPhysicalMaterial({
+          color: 0xd4efe8,
+          transparent: true,
+          opacity: 0.05,
+          transmission: 0.97,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        })
+      : new THREE.MeshStandardMaterial({
+          color: 0xd4efe8,
+          transparent: true,
+          opacity: 0.05,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        });
 
     const emissiveMat = new THREE.MeshBasicMaterial({
       color: 0x88ccff,

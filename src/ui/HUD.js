@@ -1,9 +1,13 @@
 import { GEO_ALTITUDE, CABLE_LENGTH, MAG_BOOTS_THRESHOLD } from '../constants.js';
+import { quality } from '../QualitySettings.js';
 
 export class HUD {
   constructor() {
     this.el = document.getElementById('hud');
     this.lastUpdate = 0;
+    if (quality.isMobile) {
+      this.el.style.fontSize = '16px';
+    }
   }
 
   update(state, simElapsedSeconds, controller) {
@@ -45,20 +49,20 @@ export class HUD {
     else if (alt < 1000) altStr = `${alt.toFixed(1)} km`;
     else altStr = `${alt.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} km`;
 
-    // ETA calculations (using effective speed with time scale)
+    // ETA calculations (in simulated time, using base speed without timeScale)
     let etaGeo = '';
     let etaTop = '';
     let etaGround = '';
     if (dir === 1 && alt < GEO_ALTITUDE) {
-      const hoursToGeo = (GEO_ALTITUDE - alt) / effectiveSpeed;
+      const hoursToGeo = (GEO_ALTITUDE - alt) / speed;
       etaGeo = formatDuration(hoursToGeo);
     }
     if (dir === 1 && alt < CABLE_LENGTH) {
-      const hoursToTop = (CABLE_LENGTH - alt) / effectiveSpeed;
+      const hoursToTop = (CABLE_LENGTH - alt) / speed;
       etaTop = formatDuration(hoursToTop);
     }
     if (dir === -1 && alt > 0) {
-      const hoursToBottom = alt / effectiveSpeed;
+      const hoursToBottom = alt / speed;
       etaGround = formatDuration(hoursToBottom);
     }
 
@@ -87,9 +91,9 @@ export class HUD {
       gArrow = '&#8595;';
     }
 
-    // Mag boots prompt
+    // Mag boots prompt (desktop only — no G key on mobile)
     let bootsLine = '';
-    if (controller) {
+    if (!quality.isMobile && controller) {
       if (controller.magBootsHeld) {
         bootsLine = `<div><span class="value" style="color:#4af">MAG BOOTS ACTIVE</span></div>`;
       } else if (gAbs < MAG_BOOTS_THRESHOLD && !controller.onFloor && !controller.onCeiling) {
@@ -106,8 +110,10 @@ export class HUD {
       waitLine = `<div><span class="label">DEPARTS IN </span><span class="value" style="color:#4af">${mm}:${ss}</span></div>`;
     }
 
+    const settingsHint = quality.isMobile ? '' : '<div class="label" style="margin-bottom:8px;">ESC &mdash; settings</div>';
+
     this.el.innerHTML = `
-      <div class="label" style="margin-bottom:8px;">ESC &mdash; settings</div>
+      ${settingsHint}
       <div><span class="label">ALT </span><span class="value">${altStr}</span></div>
       <div><span class="label">SPD </span><span class="value">${formatSpeed(effectiveSpeed)}</span>${timeLabel}</div>
       <div><span class="label">DIR </span><span class="value" style="color:${dirColor}">${dirLabel}</span></div>

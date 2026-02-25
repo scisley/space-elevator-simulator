@@ -9,6 +9,8 @@ import { Cable } from "./scene/Cable.js";
 import { AnchorStation } from "./scene/AnchorStation.js";
 import { OrbitalPlatform } from "./scene/OrbitalPlatform.js";
 import { FirstPersonController } from "./controls/FirstPersonController.js";
+import { MobileController } from "./controls/MobileController.js";
+import { quality } from "./QualitySettings.js";
 import { HUD } from "./ui/HUD.js";
 import { AdminPanel } from "./ui/AdminPanel.js";
 import { AmbientAudio } from "./scene/Audio.js";
@@ -44,8 +46,6 @@ const crosshair = document.getElementById("crosshair");
 const milestoneEl = document.getElementById("milestone-notification");
 
 const loadingManager = new THREE.LoadingManager();
-let texturesLoaded = 0;
-const totalTextures = 4;
 
 loadingManager.onProgress = (url, loaded, total) => {
   const pct = (loaded / total) * 100;
@@ -96,15 +96,23 @@ const cable = new Cable(scene);
 const anchor = new AnchorStation(scene);
 const platform = new OrbitalPlatform(scene);
 
-// First person controls
-const controller = new FirstPersonController(camera, renderer.domElement);
-controller.setBounds(cabin.getBounds());
+// First person controls (desktop) or mobile controller
+const controller = quality.isMobile
+  ? new MobileController(camera, renderer.domElement)
+  : new FirstPersonController(camera, renderer.domElement);
+if (!quality.isMobile) controller.setBounds(cabin.getBounds());
 
-// Camera initial position — 1m east of cable, facing east
+// Camera initial position — near outer wall over a floor glass panel.
+// Use a face-midpoint direction (30°) to avoid corner support pillars.
 const eastDir = new THREE.Vector3()
   .crossVectors(polarAxis, new THREE.Vector3(0, 1, 0))
   .normalize();
-camera.position.copy(eastDir.clone().multiplyScalar(0.001)); // 1m = 0.001 km
+const spawnDir = new THREE.Vector3(
+  Math.cos(Math.PI / 6),
+  0,
+  Math.sin(Math.PI / 6)
+).normalize();
+camera.position.copy(spawnDir.multiplyScalar(0.00185)); // halfway back toward cable center
 camera.position.y = EYE_HEIGHT;
 camera.lookAt(
   camera.position.x + eastDir.x,
@@ -158,7 +166,7 @@ adminPanel.onReturnToRealtime = () => {
     if (m.altitude <= currentAlt) triggeredMilestones.add(m.altitude);
   }
   adminPanel.hide();
-  controller.lock();
+  if (!quality.isMobile) controller.lock();
 };
 
 // --- URL deep links ---
@@ -311,30 +319,42 @@ modeSelect.querySelectorAll(".mode-btn").forEach((btn) => {
     }
 
     loadingScreen.style.display = "none";
-    controller.lock();
+    if (quality.isMobile) {
+      document.getElementById('touch-controls').style.display = 'block';
+    } else {
+      controller.lock();
+    }
     if (!audio.started) audio.start();
   });
 });
 
-// Pointer lock flow
-renderer.domElement.addEventListener("click", () => {
-  if (!controller.isLocked) {
-    controller.lock();
-  }
-});
+// Pointer lock flow (desktop only)
+if (!quality.isMobile) {
+  renderer.domElement.addEventListener("click", () => {
+    if (!controller.isLocked) {
+      controller.lock();
+    }
+  });
 
-controller.controls.addEventListener("lock", () => {
-  crosshair.style.display = "block";
-  adminPanel.hide();
-});
+  controller.controls.addEventListener("lock", () => {
+    crosshair.style.display = "block";
+    adminPanel.hide();
+  });
 
-controller.controls.addEventListener("unlock", () => {
-  crosshair.style.display = "none";
-  adminPanel.show();
-});
+  controller.controls.addEventListener("unlock", () => {
+    crosshair.style.display = "none";
+    adminPanel.show();
+  });
+}
 
-// Previous altitude for milestone direction tracking
-let prevAltitude = 0;
+// Mobile touch button wiring
+if (quality.isMobile) {
+  document.getElementById('touch-settings')?.addEventListener('click', () => {
+    if (adminPanel.visible) adminPanel.hide();
+    else adminPanel.show();
+  });
+}
+
 // Phase transition tracking for arrival/departure notifications
 let prevPhase = null;
 
@@ -419,7 +439,6 @@ function animate() {
 
   // Check milestones (skip in cinema mode — too fast to read)
   if (selectedMode !== "cinema") checkMilestones(altitudeKm);
-  prevAltitude = altitudeKm;
 
   // Update HUD
   hud.update(state, simElapsedSeconds, controller);

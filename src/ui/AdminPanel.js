@@ -1,4 +1,4 @@
-import { adminSetAltitude, adminSetSpeed, adminSetDirection, adminSetTimeScale, adminRestart, getState } from '../simulation/state.js';
+import { adminSetAltitude, adminSetDirection, adminSetTimeScale, getState } from '../simulation/state.js';
 
 export class AdminPanel {
   constructor() {

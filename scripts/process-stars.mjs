@@ -128,11 +128,6 @@ async function main() {
     const y = RADIUS * Math.sin(decRad);
     const z = -RADIUS * cosD * Math.sin(raRad);
 
-    // Brightness from magnitude using Pogson's formula
-    const brightness = Math.pow(10, -0.4 * mag);
-    const brightestFlux = Math.pow(10, -0.4 * brightest);
-    const normalizedBrightness = brightness / brightestFlux;
-
     // Point size: magnitude-linear with capped range for smoother distribution
     // pow(0.7) compresses the bright end so the biggest stars don't dominate
     const magRange = MAG_LIMIT - brightest;

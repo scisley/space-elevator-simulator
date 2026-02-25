@@ -121,6 +121,18 @@ async function main() {
 
   const sizeMB = (output.length / 1024 / 1024).toFixed(1);
   console.log(`  Saved ${OUTPUT_FILE} (${sizeMB} MB)`);
+
+  // Also generate 4K variant for mobile
+  const OUTPUT_4K = join(OUTPUT_DIR, '4k_earth_daymap.jpg');
+  console.log(`  Resizing to 4096x2048 for mobile...`);
+  const output4k = await sharp(fullRes)
+    .resize(4096, 2048, { kernel: 'lanczos3' })
+    .jpeg({ quality: 88 })
+    .toBuffer();
+  writeFileSync(OUTPUT_4K, output4k);
+  const size4kMB = (output4k.length / 1024 / 1024).toFixed(1);
+  console.log(`  Saved ${OUTPUT_4K} (${size4kMB} MB)`);
+
   console.log('Done.');
 }
 

@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { EARTH_RADIUS, ANCHOR_LAT, ANCHOR_LON, ANCHOR_LAT_RAD, ANCHOR_LON_RAD, ATMO_THICKNESS } from '../constants.js';
+import { EARTH_RADIUS, ANCHOR_LAT, ANCHOR_LON, ANCHOR_LON_RAD, ATMO_THICKNESS } from '../constants.js';
 import { getAtmosphereOpacity, getGroundPlaneOpacity } from '../simulation/physics.js';
 import { loadRegionalTexture } from '../loaders/TileLoader.js';
+import { quality } from '../QualitySettings.js';
 
 // Offset above Earth surface (km) to avoid z-fighting with the day mesh
 // 0.005 km = 5m, sits below the 10m ground station platform
@@ -29,10 +30,11 @@ export class Earth {
     const texLoader = new THREE.TextureLoader(loadingManager);
 
     // Earth sphere — use MeshStandardMaterial for correct rendering pipeline
-    const earthGeo = new THREE.SphereGeometry(EARTH_RADIUS, 128, 128);
-    const dayMap = texLoader.load('/textures/8k_earth_daymap.jpg');
+    const segs = quality.sphereSegments;
+    const earthGeo = new THREE.SphereGeometry(EARTH_RADIUS, segs, segs);
+    const dayMap = texLoader.load(quality.daymapPath);
     dayMap.colorSpace = THREE.SRGBColorSpace;
-    dayMap.anisotropy = 16;
+    dayMap.anisotropy = quality.anisotropy;
 
     this.earthMaterial = new THREE.MeshStandardMaterial({
       map: dayMap,
@@ -48,7 +50,7 @@ export class Earth {
 
     // Night lights overlay — separate mesh, additive blending
     // Offset by 5 km to avoid z-fighting with the day mesh (log depth buffer needs margin)
-    const nightGeo = new THREE.SphereGeometry(EARTH_RADIUS + 5, 128, 128);
+    const nightGeo = new THREE.SphereGeometry(EARTH_RADIUS + 5, segs, segs);
     const nightMap = texLoader.load('/textures/2k_earth_nightmap.jpg');
     // No colorSpace — keep raw sRGB values since toneMapped=false bypasses encoding
 
@@ -101,7 +103,7 @@ export class Earth {
     this.group.add(this.nightMesh);
 
     // Atmosphere glow (Fresnel-based)
-    const atmoGeo = new THREE.SphereGeometry(EARTH_RADIUS + ATMO_THICKNESS, 128, 128);
+    const atmoGeo = new THREE.SphereGeometry(EARTH_RADIUS + ATMO_THICKNESS, segs, segs);
     this.atmosphereMaterial = new THREE.ShaderMaterial({
       uniforms: {
         glowColor: { value: new THREE.Color(0.3, 0.6, 1.0) },
@@ -153,15 +155,17 @@ export class Earth {
     this.regionalPatch = null;
     this.regionalMaterial = null;
 
-    loadingManager.itemStart('regional-tiles');
-    loadRegionalTexture(ANCHOR_LAT, ANCHOR_LON).then((result) => {
-      if (result) {
-        this._createRegionalPatch(result);
-      }
-      loadingManager.itemEnd('regional-tiles');
-    }).catch(() => {
-      loadingManager.itemEnd('regional-tiles');
-    });
+    if (quality.loadRegionalTiles) {
+      loadingManager.itemStart('regional-tiles');
+      loadRegionalTexture(ANCHOR_LAT, ANCHOR_LON).then((result) => {
+        if (result) {
+          this._createRegionalPatch(result);
+        }
+        loadingManager.itemEnd('regional-tiles');
+      }).catch(() => {
+        loadingManager.itemEnd('regional-tiles');
+      });
+    }
   }
 
   /**

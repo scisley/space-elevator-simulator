@@ -63,7 +63,7 @@ export class FirstPersonController {
     this._qPitch = new THREE.Quaternion();
     this._qFlip = new THREE.Quaternion();
 
-    this.setupInput(domElement);
+    this.setupInput();
     this.setupMouseLook();
   }
 
@@ -90,7 +90,7 @@ export class FirstPersonController {
     });
   }
 
-  setupInput(domElement) {
+  setupInput() {
     document.addEventListener('keydown', (e) => {
       switch (e.code) {
         case 'KeyW': case 'ArrowUp': this.moveForward = true; break;
