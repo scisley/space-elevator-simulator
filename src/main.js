@@ -158,8 +158,7 @@ adminPanel.onEnterSandbox = () => {
 adminPanel.onReturnToRealtime = () => {
   adminReturnToRealtime();
   selectedMode = "realtime";
-  const utcSeconds = Date.now() / 1000;
-  simElapsedSeconds = utcSeconds - ANCHOR_LON_OFFSET_S;
+  simElapsedSeconds = realtimeSimSeconds();
   updateLocalState();
   const currentAlt = getState().altitudeKm;
   for (const m of MILESTONES) {
@@ -240,7 +239,17 @@ function formatDurationMs(ms) {
 }
 
 // Anchor longitude offset for UTC → local solar time (seconds)
+// -80.25° west → -19260s (~5h 21m behind UTC)
 const ANCHOR_LON_OFFSET_S = (ANCHOR_LON_RAD / (2 * Math.PI)) * 86400;
+
+// Compute simElapsedSeconds from wall clock so sun position matches local solar time.
+// Uses time-of-day (mod 86400) instead of raw Unix timestamp to avoid accumulated
+// drift between the sidereal angular velocity used for the sun and the solar day.
+function realtimeSimSeconds() {
+  const utcSeconds = Date.now() / 1000;
+  const utcTimeOfDay = ((utcSeconds % 86400) + 86400) % 86400;
+  return ((utcTimeOfDay + ANCHOR_LON_OFFSET_S) % 86400 + 86400) % 86400;
+}
 
 // Inject cinema mode label + buttons from data
 const cinemaLabel = document.createElement("div");
@@ -273,9 +282,8 @@ modeSelect.querySelectorAll(".mode-btn").forEach((btn) => {
       setCinemaPreset(CINEMA_MODES[presetIndex]);
       simElapsedSeconds = 12 * 3600;
     } else if (selectedMode === "realtime") {
-      // UTC-based day/night: compute simElapsedSeconds from wall clock
-      const utcSeconds = Date.now() / 1000;
-      simElapsedSeconds = utcSeconds - ANCHOR_LON_OFFSET_S;
+      // Sync sun position to local solar time at the anchor
+      simElapsedSeconds = realtimeSimSeconds();
 
       // Pre-populate triggered milestones for all below current altitude
       updateLocalState();
@@ -407,9 +415,8 @@ function animate() {
 
   // Advance simulation time
   if (selectedMode === "realtime") {
-    // Recompute from UTC each frame so day/night stays synced
-    const utcSeconds = Date.now() / 1000;
-    simElapsedSeconds = utcSeconds - ANCHOR_LON_OFFSET_S;
+    // Recompute from wall clock each frame so day/night stays synced
+    simElapsedSeconds = realtimeSimSeconds();
   } else {
     // Sandbox/Cinema: accumulate with timeScale
     simElapsedSeconds += delta * state.timeScale;

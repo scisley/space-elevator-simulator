@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { quality } from '../QualitySettings.js';
+
+const MOBILE_BRIGHTNESS_SCALE = 0.7;
 
 export class Stars {
   constructor(scene, loadingManager, polarAxis) {
@@ -46,7 +49,7 @@ export class Stars {
 
       this.material = new THREE.ShaderMaterial({
         uniforms: {
-          brightnessMultiplier: { value: 1.3 },
+          brightnessMultiplier: { value: 1.3 * (quality.isMobile ? MOBILE_BRIGHTNESS_SCALE : 1) },
         },
         vertexShader: `
           attribute float starSize;
@@ -85,7 +88,8 @@ export class Stars {
 
   setBrightnessMultiplier(value) {
     if (this.material) {
-      this.material.uniforms.brightnessMultiplier.value = value;
+      const scale = quality.isMobile ? MOBILE_BRIGHTNESS_SCALE : 1;
+      this.material.uniforms.brightnessMultiplier.value = value * scale;
     }
   }
 
