@@ -65,6 +65,7 @@
         background: #000;
         color: #fff;
         font-family: "Courier New", monospace;
+        overflow-y: auto;
       }
       #loading-screen h1 {
         font-size: 2rem;
@@ -95,6 +96,29 @@
         flex-direction: column;
         gap: 12px;
         align-items: center;
+      }
+      #loading-about {
+        background: rgba(20, 40, 60, 0.75);
+        border: 1px solid #4af;
+        border-radius: 4px;
+        color: #cfeeff;
+        font-family: "Courier New", monospace;
+        font-size: 0.72rem;
+        cursor: pointer;
+        letter-spacing: 0.16em;
+        text-decoration: none;
+        padding: 7px 12px;
+        margin-top: 18px;
+        text-shadow: 0 0 6px rgba(74, 170, 255, 0.4);
+        transition:
+          background 0.2s,
+          color 0.2s,
+          border-color 0.2s;
+      }
+      #loading-about:hover {
+        background: rgba(40, 80, 120, 0.9);
+        border-color: #6cf;
+        color: #fff;
       }
       .mode-btn {
         background: rgba(20, 40, 60, 0.9);
@@ -365,9 +389,31 @@
         line-height: 1.8;
         margin-bottom: 1rem;
       }
-      .about-inner strong { color: #fff; }
-      .about-inner a { color: #4af; text-decoration: underline; }
-      .about-inner a:hover { color: #6cf; }
+      .about-author-photo {
+        display: block;
+        width: 140px;
+        max-width: 100%;
+        border-radius: 6px;
+        border: 1px solid #1a3a5c;
+        float: left;
+        margin: 0.3rem 1rem 0.6rem 0;
+      }
+      @media (max-width: 680px) {
+        .about-author-photo {
+          float: none;
+          margin: 0.5rem auto 1rem;
+        }
+      }
+      .about-inner strong {
+        color: #fff;
+      }
+      .about-inner a {
+        color: #4af;
+        text-decoration: underline;
+      }
+      .about-inner a:hover {
+        color: #6cf;
+      }
       .about-inner ul {
         list-style: none;
         padding: 0;
@@ -406,8 +452,8 @@
           SANDBOX<span class="subtitle">Choose your own adventure</span>
         </button>
         <!-- Cinema mode buttons injected dynamically from CINEMA_MODES -->
-        <button id="loading-about" style="background:none; border:none; color:#555; font-family:'Courier New',monospace; font-size:0.7rem; cursor:pointer; letter-spacing:0.15em; margin-top:8px; text-decoration:underline; padding:4px;">ABOUT THIS SIMULATION</button>
       </div>
+      <button id="loading-about">ABOUT THIS SIMULATION</button>
     </div>
 
     <div id="crosshair"></div>
@@ -485,8 +531,16 @@
         <button id="admin-share" style="flex: 1">Share Link</button>
         <button id="admin-restart">Return to Real-time</button>
       </div>
-      <div class="btn-row" style="margin-top: 4px; border-top: 1px solid #1a3a5c; padding-top: 8px;">
-        <button id="admin-about" style="flex: 1; color: #888; border-color: #555;">About</button>
+      <div
+        class="btn-row"
+        style="margin-top: 4px; border-top: 1px solid #1a3a5c; padding-top: 8px"
+      >
+        <button
+          id="admin-about"
+          style="flex: 1; color: #888; border-color: #555"
+        >
+          About
+        </button>
       </div>
     </div>
 
@@ -496,29 +550,159 @@
         <h2>SPACE ELEVATOR SIMULATOR</h2>
 
         <h3>What is a Space Elevator?</h3>
-        <p>What would it be like to take an elevator ride into space? It's one of the great thought experiments of aerospace engineering — a cable stretching from Earth's surface all the way to a counterweight at 100,000 km, held taut not by a tower from below, but by centrifugal force pulling the counterweight outward, like a ball on a string. Elevator cars called "climbers" travel up and down the cable, potentially offering cheap, reusable access to space without a single rocket engine.</p>
-        <p>The biggest engineering obstacle is the cable itself. It would need to be stronger than any material we've ever built — carbon nanotubes are the leading candidate, and we can make them in the lab, just not yet in the lengths required.</p>
-        <p><a href="https://en.wikipedia.org/wiki/Space_elevator" target="_blank" rel="noopener noreferrer">Space elevator — Wikipedia ↗</a></p>
+        <p>
+          What would it be like to take an elevator ride into space? It's one of
+          the great thought experiments of aerospace engineering — a cable
+          stretching from Earth's surface all the way to a counterweight at
+          100,000 km, held taut not by a tower from below, but by centrifugal
+          force pulling the counterweight outward, like a ball on a string.
+          Elevator cars called "climbers" travel up and down the cable,
+          potentially offering cheap, reusable access to space without a single
+          rocket engine.
+        </p>
+        <p>
+          The biggest engineering obstacle is the cable itself. It would need to
+          be stronger than any material we've ever built — carbon nanotubes are
+          the leading candidate, and we can make them in the lab, just not yet
+          in the lengths required.
+        </p>
+        <p>
+          For more details, see this great wikipedia page:
+          <a
+            href="https://en.wikipedia.org/wiki/Space_elevator"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Space elevator — Wikipedia ↗</a
+          >
+        </p>
 
         <h3>How This Simulation Works</h3>
-        <p><strong>Real-Time Mode</strong> syncs to the actual UTC clock. At 300 km/h, the elevator takes ~14 days to travel the full 100,000 km to the counterweight station, waits 10 minutes, then descends for another ~14 days — a ~28-day round trip. Every visitor is riding the same elevator at the same position in the cycle. Open the app in a few weeks and it'll be somewhere completely different.</p>
-        <p><strong>Sandbox Mode</strong> gives you full control via the settings panel (ESC key). You can jump to any altitude instantly, set the time scale from 1× up to 10,000× to watch the day/night cycle blur past, reverse direction, or stop mid-cable. A <strong>Share Link</strong> button generates a URL encoding your exact altitude, speed, and direction — useful for sending a friend to a specific view.</p>
-        <p><strong>Cinematic Modes</strong> are pre-programmed journeys — <em>Express Ascent</em> (full trip in 5 minutes) and <em>Ludicrous Speed</em> (ground to GEO in 1 minute) — designed to show off the simulation's full range without waiting two weeks.</p>
+        <p>
+          <strong>Real-Time Mode</strong> syncs to the actual UTC clock. At 300
+          km/h, the elevator takes ~14 days to travel the full 100,000 km to the
+          counterweight station, waits 10 minutes, then descends for another ~14
+          days — a ~28-day round trip. Every visitor is riding the same elevator
+          at the same position in the cycle. Open the app in a few weeks and
+          it'll be somewhere completely different.
+        </p>
+        <p>
+          <strong>Sandbox Mode</strong> gives you full control via the settings
+          panel (ESC key). You can jump to any altitude instantly, set the time
+          scale from 1× up to 10,000× to watch the day/night cycle blur past,
+          reverse direction, or stop mid-cable. A
+          <strong>Share Link</strong> button generates a URL encoding your exact
+          altitude, speed, and direction — useful for sending a friend to a
+          specific view.
+        </p>
+        <p>
+          <strong>Cinematic Modes</strong> are pre-programmed journeys —
+          <em>Express Ascent</em> (full trip in 5 minutes) and
+          <em>Ludicrous Speed</em> (ground to GEO in 1 minute) — designed to
+          show off the simulation's full range without waiting two weeks.
+        </p>
 
         <h3>Features</h3>
         <ul>
-          <li><strong>Real star catalog</strong> — ~8,900 naked-eye stars from the <a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">HYG v4.1 catalog ↗</a> (Hipparcos, Yale, and Gliese data), with accurate positions, colors, and brightness</li>
-          <li><strong>Live sun movement</strong> — simulates Earth's rotation from the co-rotating frame of the elevator cable</li>
-          <li><strong>Day/night cycle</strong> — city lights visible on the dark side of Earth; atmosphere dims naturally at night</li>
-          <li><strong>Altitude-accurate gravity</strong> — gravity weakens with altitude, crosses zero at geostationary orbit (~35,786 km) as centrifugal force takes over. Magnetic boots activate in low-g regions.</li>
-          <li><strong>Atmosphere rendering</strong> — sky fades from blue to black as you ascend through the stratosphere</li>
-          <li><strong>High-resolution satellite imagery</strong> — regional tiles from <a href="https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api" target="_blank" rel="noopener noreferrer">NASA GIBS ↗</a> provide sharp ground detail at low altitudes</li>
-          <li><strong>Milestone notifications</strong> — named waypoints for Mount Everest, the Kármán Line, ISS orbit, GEO, and more</li>
+          <li>
+            <strong>Real star catalog</strong> — ~8,900 naked-eye stars from the
+            <a
+              href="https://github.com/astronexus/HYG-Database"
+              target="_blank"
+              rel="noopener noreferrer"
+              >HYG v4.1 catalog ↗</a
+            >
+            (Hipparcos, Yale, and Gliese data), with accurate positions and
+            brightness
+          </li>
+          <li>
+            <strong>Live sun movement</strong> — simulates Earth's rotation from
+            the co-rotating frame of the elevator cable
+          </li>
+          <li>
+            <strong>Day/night cycle</strong> — city lights visible on the dark
+            side of Earth; atmosphere dims naturally at night
+          </li>
+          <li>
+            <strong>Altitude-accurate gravity</strong> — gravity weakens with
+            altitude, crosses zero at geostationary orbit (~35,786 km) as
+            centrifugal force takes over. You can activate magnetic boots in
+            low-g regions to avoid spending too long floating around.
+          </li>
+          <li>
+            <strong>Atmosphere rendering</strong> — sky fades from blue to black
+            as you ascend through the stratosphere
+          </li>
+          <li>
+            <strong>High-resolution satellite imagery</strong> — regional tiles
+            from
+            <a
+              href="https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api"
+              target="_blank"
+              rel="noopener noreferrer"
+              >NASA GIBS ↗</a
+            >
+            provide sharp ground detail at low altitudes
+          </li>
+          <li>
+            <strong>Milestone notifications</strong> — named waypoints for Mount
+            Everest, the Kármán Line, ISS orbit, GEO, and more
+          </li>
         </ul>
 
         <h3>About the Author</h3>
-        <p>Steve Isley is an engineer and researcher with an unusually wide career path: he started in aerospace engineering at the University of Washington (running the Kirsten Wind Tunnel), earned a Master's from Georgia Tech's Aerospace Systems Design Laboratory, then pivoted to policy and behavioral science with a Ph.D. from the Pardee RAND Graduate School. He has worked as a behavioral scientist at the National Renewable Energy Laboratory and Amazon, and is now focused on AI and sustainability as co-founder of CountOn and an advisor at the Future of Life Foundation. This simulator is a side project.</p>
-        <p><a href="https://www.linkedin.com/in/stevecisley/" target="_blank" rel="noopener noreferrer">Connect on LinkedIn ↗</a></p>
+        <img
+          src="/Steve-headshot-2-small.png"
+          alt="Steve Isley headshot"
+          class="about-author-photo"
+        />
+        <p>
+          Hi 👋, my name is Steve Isley and I've had a weird career path: I
+          started in aerospace engineering at the University of Washington,
+          earned a Master's from Georgia Tech's Aerospace Systems Design
+          Laboratory, then pivoted to policy and behavioral science with a Ph.D.
+          from the Pardee RAND Graduate School. I've worked as a behavioral
+          scientist at the National Renewable Energy Laboratory and Amazon. Then
+          I chose to build a sustainable consumption startup called CountOn. As
+          with everyone building a startup in 2022, I got hooked on AI. After
+          shutting down CountOn, I spent a few years as an AI consultant before
+          joining
+          <a
+            href="https://www.bsr.org/"
+            target="_blank"
+            rel="noopener noreferrer"
+            >BSR</a
+          >
+          as the head of AI and Knowledge Management.
+        </p>
+        <p>
+          <a
+            href="https://www.linkedin.com/in/stevecisley/"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Connect on LinkedIn ↗</a
+          >
+        </p>
+        <h3>How I Build This</h3>
+        <p>
+          This simulator is a side project. It's actually been on my mind for
+          nearly a decade, but AI coding agents finally made it possible. I
+          mostly used Claude Code, but a little Codex sprinkled in as well
+          (usually when I ran out of tokens for Claude Code). In the past, I
+          estimated this as a two week project - partly because I'd have to
+          learn all sorts of new libraries. With AI coding agents, I did this in
+          around 15 hours. And that's with just "regular" AI support - no fancy
+          swarms or git workspaces. Much of the work was done while my family
+          watched TV shows or movies.
+        </p>
+        <p>
+          The code free and open source. Enjoy!
+          <a
+            href="https://github.com/scisley/space-elevator-simulator"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub ↗</a
+          >
+        </p>
       </div>
     </div>
 
@@ -540,9 +724,15 @@
         function hideAbout() {
           overlay.style.display = "none";
         }
-        document.getElementById("about-close").addEventListener("click", hideAbout);
-        document.getElementById("admin-about").addEventListener("click", showAbout);
-        document.getElementById("loading-about").addEventListener("click", showAbout);
+        document
+          .getElementById("about-close")
+          .addEventListener("click", hideAbout);
+        document
+          .getElementById("admin-about")
+          .addEventListener("click", showAbout);
+        document
+          .getElementById("loading-about")
+          .addEventListener("click", showAbout);
         document.addEventListener("keydown", function (e) {
           if (e.key === "Escape" && overlay.style.display !== "none") {
             hideAbout();
